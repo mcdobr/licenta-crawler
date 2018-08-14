@@ -1,16 +1,33 @@
 package me.mircea.licenta.crawler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class Miner {
+import me.mircea.licenta.core.entities.Product;
+
+
+public class Miner implements Callable<List<String>> {
+	private Document doc;
 	private Map<Element, Integer> depths;
 	
-	public Map<Element, Integer> getDepthOfTree(Element root) {
-		Map<Element, Integer> depths = new HashMap<>();
+	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
+	
+	public Miner(Document doc) {
+		this.doc = doc;
+		this.depths = new HashMap<>();
+	}
+	
+	/*
+	private Map<Element, Integer> getDepthOfTree(Element root) {
 		getDepthOfSubtree(root, depths);
 		return depths;
 	}
@@ -40,7 +57,7 @@ public class Miner {
 			}
 		}
 	}
-
+	*/
 	/**
 	 * @brief This function implements the MDR algorithm explained in a paper by
 	 *        Zhai and Liu.
@@ -50,9 +67,30 @@ public class Miner {
 	 *            The maximum number of tag nodes that a generalized tree node can
 	 *            have.
 	 */
-	public void mineDataRegions(Element node, final int maxInternalTagNodes) {
+	/*private void mineDataRegions(Element node, final int maxInternalTagNodes) {
 		if (depths.get(node) >= 3) {
 			compareCombinations(node.children(), maxInternalTagNodes);
 		}
+	}
+	 */
+
+	@Override
+	public List<String> call() throws Exception {
+		doc.select("style").remove();
+		doc.select("script").remove();
+		doc.getElementsByAttribute("style").removeAttr("style");
+		
+		List<Product> products = new ArrayList<>();
+		
+		Elements productElements = doc.select("[class*='produ']:has(img):has(a)");
+		for (Element element : productElements) {
+			String title = element.select("[class*='titl'],[class*='nume'],[class*='name']").text();
+			String price = element.select("[class*='pret'],[class*='price']").text();
+			
+			logger.error("{} priced at {}", title, price);
+		}
+		
+		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]
+		return new ArrayList<>();
 	}
 }

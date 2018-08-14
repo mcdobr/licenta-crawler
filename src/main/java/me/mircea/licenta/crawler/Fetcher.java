@@ -7,10 +7,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -25,7 +28,8 @@ public class Fetcher {
 	private String startUrl;
 	private String domain;
 	private WebDriver driver;
-
+	private ExecutorService exec = Executors.newCachedThreadPool();
+	
 	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
 	private static final int CRAWLER_DELAY = 3600;
 
@@ -95,29 +99,28 @@ public class Fetcher {
 		Set<Document> documents = new HashSet<>();
 
 		String url = startUrl;
-		boolean havePagesLeft = true;
 		driver.get(url);
+		
+		boolean havePagesLeft = true;
 		while (havePagesLeft) {
 			Document doc = getDocumentStripped(driver.getPageSource());
 			documents.add(doc);
 			logger.info("Got document {}", driver.getCurrentUrl());
-
-			List<WebElement> queryResults = driver
-					.findElements(By.xpath("//ul[@class='pagination']/li/a[text()[contains(.,'>')] | ./i]"));
-
-			havePagesLeft &= !queryResults.isEmpty();
-			if (!queryResults.isEmpty()) {
-				WebElement nextPageLink = queryResults.get(0);
-				WebElement parentOfLink = nextPageLink.findElement(By.xpath("./.."));
-
-				havePagesLeft &= !(parentOfLink.getAttribute("class").contains("disabled")
-						|| nextPageLink.getAttribute("class").contains("disabled"));
-				if (havePagesLeft)
-					nextPageLink.click();
-			}
+			
+			exec.submit(new Miner(doc));
+			
+			List<WebElement> followingPaginationLink = driver
+					.findElements(By.xpath("//ul[@class='pagination']/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
+			
+			if (!followingPaginationLink.isEmpty()) {
+				WebElement nextPageLink = followingPaginationLink.get(0);
+				nextPageLink.click();
+			} else
+				havePagesLeft = false;
+			
 			Thread.sleep(CRAWLER_DELAY);
 		}
-
+		
 		driver.quit();
 		return documents;
 	}
@@ -141,14 +144,15 @@ public class Fetcher {
 	public static void main(String[] args) {
 
 		String domain = "https://carturesti.ro";
-		String startUrl = "http://www.librariilealexandria.ro/carte";
-		String startUrl2 = "https://www.libris.ro/carti";
+		String startUrl1 = "https://carturesti.ro/raft/carte-109";
+		String startUrl2 = "http://www.librariilealexandria.ro/carte";
+		String startUrl3 = "https://www.libris.ro/carti";
 		// TODO: use this
 		// https://stackoverflow.com/questions/44912203/selenium-web-driver-java-element-is-not-clickable-at-point-36-72-other-el
 		// for libris, and fix selection of next page from carturesti
 		try {
-			Fetcher fetcher = new Fetcher(startUrl2);
-			fetcher.getMultiProductWebPages(startUrl2);
+			Fetcher fetcher = new Fetcher(startUrl1);
+			fetcher.getMultiProductWebPages(startUrl1);
 		} catch (MalformedURLException | InterruptedException e) {
 			logger.debug("Problem regarding gathering pages: {}.", e.getStackTrace());
 		}
