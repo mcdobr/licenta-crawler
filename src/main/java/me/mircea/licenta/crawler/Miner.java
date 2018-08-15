@@ -88,6 +88,9 @@ public class Miner implements Callable<List<String>> {
 			String price = element.select("[class*='pret'],[class*='price']").text();
 			
 			logger.error("{} priced at {}", title, price);
+			
+			Product p = new Product();
+			p.setTitle(title);
 		}
 		
 		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]

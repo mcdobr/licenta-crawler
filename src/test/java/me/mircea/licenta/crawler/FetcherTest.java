@@ -3,7 +3,7 @@ package me.mircea.licenta.crawler;
 /**
  * Unit test for simple App.
  */
-public class AppTest 
+public class FetcherTest 
 {
 	/*
     @Test
