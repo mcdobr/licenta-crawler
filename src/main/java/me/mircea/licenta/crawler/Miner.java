@@ -1,8 +1,14 @@
 package me.mircea.licenta.crawler;
 
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -12,6 +18,7 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
 
 
@@ -66,14 +73,33 @@ public class Miner implements Callable<List<String>> {
 	 * @param maxInternalTagNodes
 	 *            The maximum number of tag nodes that a generalized tree node can
 	 *            have.
-	 */
-	/*private void mineDataRegions(Element node, final int maxInternalTagNodes) {
+	 *private void mineDataRegions(Element node, final int maxInternalTagNodes) {
 		if (depths.get(node) >= 3) {
 			compareCombinations(node.children(), maxInternalTagNodes);
 		}
 	}
 	 */
 
+	/**
+	 * @brief Transforms a pricetag string into a nominal value.
+	 * @param price
+	 * @param locale
+	 * @return
+	 * @throws ParseException
+	 */
+	// TODO: Should return a nominalValue, currency pair.
+	public BigDecimal parse(final String price, final Locale locale) throws ParseException {
+		final NumberFormat noFormat = NumberFormat.getNumberInstance(locale);
+		if (noFormat instanceof DecimalFormat) {
+			((DecimalFormat)noFormat).setParseBigDecimal(true);
+		}
+		
+		BigDecimal nominalValue = (BigDecimal)noFormat.parse(price);
+		if (nominalValue.stripTrailingZeros().scale() <= 0 && nominalValue.compareTo(BigDecimal.valueOf(100)) >= 1)
+			nominalValue = nominalValue.divide(BigDecimal.valueOf(100));
+		return nominalValue;
+	}
+	
 	@Override
 	public List<String> call() throws Exception {
 		doc.select("style").remove();
@@ -87,10 +113,20 @@ public class Miner implements Callable<List<String>> {
 			String title = element.select("[class*='titl'],[class*='nume'],[class*='name']").text();
 			String price = element.select("[class*='pret'],[class*='price']").text();
 			
+			
+			// TODO : handle price right
 			logger.error("{} priced at {}", title, price);
 			
 			Product p = new Product();
 			p.setTitle(title);
+		
+			
+			PricePoint pricePoint = new PricePoint();
+			Locale roLocale = Locale.forLanguageTag("ro-ro");
+			
+			pricePoint.setNominalValue(parse(price, roLocale));
+			pricePoint.setCurrency(Currency.getInstance(roLocale));
+			logger.error("A pricepoint of {} {}", pricePoint.getNominalValue().toPlainString(), pricePoint.getCurrency());
 		}
 		
 		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]
