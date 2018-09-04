@@ -25,7 +25,7 @@ import me.mircea.licenta.core.entities.Product;
 import me.mircea.licenta.core.utils.HibernateUtil;
 
 
-public class Miner implements Callable<List<String>> {
+public class Miner implements Runnable {
 	private Document doc;
 	private Map<Element, Integer> depths;
 	
@@ -83,8 +83,9 @@ public class Miner implements Callable<List<String>> {
 		}
 	}
 	*/
+
 	@Override
-	public List<String> call() throws Exception {
+	public void run() {
 		doc.select("style").remove();
 		doc.select("script").remove();
 		doc.getElementsByAttribute("style").removeAttr("style");
@@ -108,9 +109,6 @@ public class Miner implements Callable<List<String>> {
 		session.getTransaction().commit();
 		session.close();
 		logger.info("Ended mining for products...");
-		
-		
 		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]
-		return new ArrayList<>();
 	}
 }
