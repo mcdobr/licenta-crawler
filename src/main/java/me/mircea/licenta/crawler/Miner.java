@@ -12,6 +12,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Root;
+import javax.persistence.metamodel.EntityType;
+
+import org.hibernate.Criteria;
 import org.hibernate.Hibernate;
 import org.hibernate.Session;
 import org.jsoup.nodes.Document;
@@ -84,30 +90,43 @@ public class Miner implements Runnable {
 	}
 	*/
 
-	@Override
-	public void run() {
+	private void cleanHtml() {
 		doc.select("style").remove();
 		doc.select("script").remove();
 		doc.getElementsByAttribute("style").removeAttr("style");
-		
-		List<Product> products = new ArrayList<>();
-		
-		Elements productElements = doc.select("[class*='produ']:has(img):has(a)");
+	}
+	
+	@Override
+	public void run() {
+		cleanHtml();
 
+		// Select all leaf nodes that look like a product
+		String productSelector = "[class*='produ']:has(img):has(a)";		
+		Elements productElements = doc.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
 		logger.info("Started mining for products...");
-		Session session = HibernateUtil.getSessionFactory().openSession();
-		session.beginTransaction();
 		
 		for (Element element : productElements) {
+			Session session = HibernateUtil.getSessionFactory().openSession();
+			session.beginTransaction();
 			
-			//Product p = DataRecordNormalizer.extractProduct(element);
-			//session.save(p);	
-
+			CriteriaBuilder cb = session.getCriteriaBuilder();
+			CriteriaQuery<Product> cq = cb.createQuery(Product.class);
+			Root<Product> product = cq.from(Product.class);
+	
+			cq.select(product);
+			
+			
+			List<Product> products = session.createQuery(cq).getResultList();
+			
+			Product p = DataRecordNormalizer.extractProduct(element);
+			logger.error("Length of title is {}", p.getTitle().length());
+			session.save(p);	
+			
 			logger.error("Saved product to db.");
-		}
 
-		session.getTransaction().commit();
-		session.close();
+			session.getTransaction().commit();
+			session.close();
+		}
 		logger.info("Ended mining for products...");
 		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]
 	}

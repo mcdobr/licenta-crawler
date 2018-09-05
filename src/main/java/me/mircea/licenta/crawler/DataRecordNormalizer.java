@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
+import me.mircea.licenta.core.utils.HibernateUtil;
 
 public class DataRecordNormalizer {
 	private static final Logger logger = LoggerFactory.getLogger(DataRecordNormalizer.class);
@@ -20,46 +21,47 @@ public class DataRecordNormalizer {
 	public static Product extractProduct(Element element) {
 		String title = element.select("[class*='titl'],[class*='nume'],[class*='name']").text();
 		String price = element.select("[class*='pret'],[class*='price']").text();
-		
+
 		// TODO : handle price right
 		logger.info("{} priced at {}", title, price);
-	
-		
-		Locale roLocale = Locale.forLanguageTag("ro-ro");
 
-		PricePoint pricePoint = new PricePoint();
-		try {
-			pricePoint.setNominalValue(parsePriceTag(price, roLocale));
-			pricePoint.setCurrency(Currency.getInstance(roLocale));
-		} catch (ParseException e) {
-			logger.warn(e.getMessage());
-		}
-		logger.info("A pricepoint of {} {}", pricePoint.getNominalValue().toPlainString(), pricePoint.getCurrency());
+		Locale locale = Locale.forLanguageTag("ro-ro");
+
+		// logger.info("A pricepoint of {} {}",
+		// pricePoint.getNominalValue().toPlainString(), pricePoint.getCurrency());
+
 		
 		Product p = new Product();
 		p.setTitle(title);
-		p.getPricepoints().add(pricePoint);
 		
+		try {
+			PricePoint point = parsePriceTag(price, locale);
+			p.getPricepoints().add(point);
+		} catch (ParseException e) {
+			logger.error("Price tag was ill-formated");
+		}
+
 		return p;
 	}
-	
+
 	/**
-	 * @brief Transforms a price tag string into a nominal value.
+	 * @brief Transforms a price tag string into a PricePoint.
 	 * @param price
 	 * @param locale
 	 * @return
 	 * @throws ParseException
 	 */
 	// TODO: Should return a nominalValue, currency pair.
-	private static BigDecimal parsePriceTag(final String price, final Locale locale) throws ParseException {
+	private static PricePoint parsePriceTag(final String price, final Locale locale) throws ParseException {
 		final NumberFormat noFormat = NumberFormat.getNumberInstance(locale);
 		if (noFormat instanceof DecimalFormat) {
-			((DecimalFormat)noFormat).setParseBigDecimal(true);
+			((DecimalFormat) noFormat).setParseBigDecimal(true);
 		}
-		
-		BigDecimal nominalValue = (BigDecimal)noFormat.parse(price);
+
+		BigDecimal nominalValue = (BigDecimal) noFormat.parse(price);
 		if (nominalValue.stripTrailingZeros().scale() <= 0 && nominalValue.compareTo(BigDecimal.valueOf(100)) >= 1)
 			nominalValue = nominalValue.divide(BigDecimal.valueOf(100));
-		return nominalValue;
+
+		return new PricePoint(null, nominalValue, Currency.getInstance(locale), null, null);
 	}
 }
