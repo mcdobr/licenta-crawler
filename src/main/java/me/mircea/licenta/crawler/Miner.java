@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import javax.persistence.EntityManager;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
@@ -109,20 +110,20 @@ public class Miner implements Runnable {
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
 			
+			Product p = DataRecordNormalizer.extractProduct(element);
+			
 			CriteriaBuilder cb = session.getCriteriaBuilder();
 			CriteriaQuery<Product> cq = cb.createQuery(Product.class);
 			Root<Product> product = cq.from(Product.class);
-	
+			
+			cq.where(cb.equal(product.get("title"), p.getTitle()));
 			cq.select(product);
 			
-			
 			List<Product> products = session.createQuery(cq).getResultList();
-			
-			Product p = DataRecordNormalizer.extractProduct(element);
-			logger.error("Length of title is {}", p.getTitle().length());
-			session.save(p);	
-			
-			logger.error("Saved product to db.");
+			if (products.isEmpty()) {
+				session.save(p);
+				logger.error("Saved product to db.");
+			}
 
 			session.getTransaction().commit();
 			session.close();

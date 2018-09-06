@@ -25,16 +25,6 @@ public final class CrawlerStart {
 	private static final Logger logger = LoggerFactory.getLogger(CrawlerStart.class);
 
 	public static void main(String[] args) {
-		
-		Session ses = HibernateUtil.getSessionFactory().openSession();
-		ses.beginTransaction();
-		
-		ses.save(new Product());
-		
-		ses.getTransaction().commit();
-		ses.close();
-		
-		
 		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109",*/
 				"http://www.librariilealexandria.ro/carte"/*,
 				"https://www.libris.ro/carti",
