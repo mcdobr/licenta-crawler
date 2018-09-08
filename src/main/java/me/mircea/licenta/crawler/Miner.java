@@ -1,25 +1,11 @@
 package me.mircea.licenta.crawler;
 
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.Callable;
-
-import javax.persistence.EntityManager;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
-import javax.persistence.metamodel.EntityType;
-
-import org.hibernate.Criteria;
-import org.hibernate.Hibernate;
 import org.hibernate.Session;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -27,7 +13,6 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
 import me.mircea.licenta.core.utils.HibernateUtil;
 
@@ -129,6 +114,5 @@ public class Miner implements Runnable {
 			session.close();
 		}
 		logger.info("Ended mining for products...");
-		////TODO: use following xpath to get elements: //*[contains(@class, 'produ') and descendant::img and descendant::a]
 	}
 }

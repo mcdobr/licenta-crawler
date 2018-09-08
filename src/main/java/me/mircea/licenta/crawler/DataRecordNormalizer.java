@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
-import me.mircea.licenta.core.utils.HibernateUtil;
 
 public class DataRecordNormalizer {
 	private static final Logger logger = LoggerFactory.getLogger(DataRecordNormalizer.class);
