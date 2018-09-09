@@ -45,15 +45,10 @@ public class Fetcher implements Runnable {
 
 		FirefoxProfile profile = new FirefoxProfile();
 		profile.setPreference("permissions.default.image", 2); // Don't load images
-
 		profile.setPreference("dom.popup_maximum", 0);
 		profile.setPreference("privacy.popups.showBrowserMessage", false);
-		/*
-		 * profile.setPreference("dom.disable_beforeunload", true); // Disable pop-ups
-		 * profile.setPreference("network.cookie.cookieBehavior", 2); // Disable cookies
-		 */
 		FirefoxOptions opts = new FirefoxOptions();
-		// opts.setHeadless(true);
+		opts.setHeadless(true);
 		opts.setProfile(profile);
 
 		this.driver = new FirefoxDriver(opts);
@@ -108,8 +103,7 @@ public class Fetcher implements Runnable {
 	}
 
 	private boolean isWorthVisiting(String url) throws MalformedURLException {
-		boolean result = getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
-		return result;
+		return getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
 	}
 
 	@Override
