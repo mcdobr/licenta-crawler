@@ -1,8 +1,5 @@
 package me.mircea.licenta.crawler;
 
-/**
- * Unit test for simple App.
- */
 public class FetcherTest 
 {
 	/*

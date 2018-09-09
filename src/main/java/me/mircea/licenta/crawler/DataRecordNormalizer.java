@@ -25,11 +25,6 @@ public class DataRecordNormalizer {
 		logger.info("{} priced at {}", title, price);
 
 		Locale locale = Locale.forLanguageTag("ro-ro");
-
-		// logger.info("A pricepoint of {} {}",
-		// pricePoint.getNominalValue().toPlainString(), pricePoint.getCurrency());
-
-		
 		Product p = new Product();
 		p.setTitle(title);
 		
@@ -50,7 +45,6 @@ public class DataRecordNormalizer {
 	 * @return
 	 * @throws ParseException
 	 */
-	// TODO: Should return a nominalValue, currency pair.
 	private static PricePoint parsePriceTag(final String price, final Locale locale) throws ParseException {
 		final NumberFormat noFormat = NumberFormat.getNumberInstance(locale);
 		if (noFormat instanceof DecimalFormat) {
