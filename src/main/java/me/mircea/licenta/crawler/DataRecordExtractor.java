@@ -1,6 +1,7 @@
 package me.mircea.licenta.crawler;
 
 import java.text.ParseException;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -10,36 +11,37 @@ import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
+import me.mircea.licenta.core.utils.ImmutablePair;
 
-public class DataRecordNormalizer {
-	private static final Logger logger = LoggerFactory.getLogger(DataRecordNormalizer.class);
-	
-	
-	private DataRecordNormalizer() {
+public class DataRecordExtractor {
+	private static final Logger logger = LoggerFactory.getLogger(DataRecordExtractor.class);
+
+	private DataRecordExtractor() {
 	}
 
 	/**
 	 * @brief Extracts a product from the given html element.
 	 * @param htmlElement
+	 * @param retrievedTime 
 	 * @return
 	 */
-	public static Product extractProduct(Element htmlElement) {
+	// TODO: refactor this into two functions?
+	public static ImmutablePair<Product, PricePoint> extractProductAndPricePoint(Element htmlElement, Locale locale, Instant retrievedTime) {
 		String title = htmlElement.select("[class*='titl'],[class*='nume'],[class*='name']").text();
 		String price = htmlElement.select("[class*='pret'],[class*='price']").text();
 		logger.debug("{} priced at {}", title, price);
 
-		Locale locale = Locale.forLanguageTag("ro-ro");
-		Product p = new Product();
-		p.setTitle(title);
+		Product product = new Product();
+		product.setTitle(title);
 
+		PricePoint pricePoint = null;
 		try {
-			PricePoint point = PricePoint.valueOf(price, locale);
-			p.getPricepoints().add(point);
+			pricePoint = PricePoint.valueOf(price, locale, retrievedTime);
 		} catch (ParseException e) {
 			logger.warn("Price tag was ill-formated");
 		}
 
-		return p;
+		return new ImmutablePair<Product, PricePoint>(product, pricePoint);
 	}
 
 	public static String extractProductLink(Element htmlElement) {

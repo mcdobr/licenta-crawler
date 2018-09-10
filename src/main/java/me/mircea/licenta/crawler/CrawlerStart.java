@@ -13,7 +13,7 @@ public final class CrawlerStart {
 	private static final Logger logger = LoggerFactory.getLogger(CrawlerStart.class);
 
 	public static void main(String[] args) {
-		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109",*/
+		List<String> seedList = Arrays.asList("https://carturesti.ro/raft/carte-109",
 				"http://www.librariilealexandria.ro/carte"/*,
 				"https://www.libris.ro/carti",
 				"https://www.emag.ro/search/carti"*/);

@@ -1,8 +1,10 @@
 package me.mircea.licenta.crawler;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,8 +20,10 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
 import me.mircea.licenta.core.utils.HibernateUtil;
+import me.mircea.licenta.core.utils.ImmutablePair;
 
 /**
  * @author mircea
@@ -30,14 +34,16 @@ import me.mircea.licenta.core.utils.HibernateUtil;
  */
 public class Miner implements Runnable {
 	private Document doc;
+	private final Instant retrievedTime;
 	private Map<Element, Integer> depths;
 	
 	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
 	private static final Pattern isbn13Pattern = Pattern.compile("97(?:8|9)([ -])\\d{1,5}\\1\\d{1,7}\\1\\d{1,6}\\1\\d");
 	private static final Pattern isbn10Pattern = Pattern.compile("");
 
-	public Miner(Document doc) {
+	public Miner(Document doc, Instant retrievedTime) {
 		this.doc = doc;
+		this.retrievedTime = retrievedTime;
 		this.depths = new HashMap<>();
 	}
 
@@ -99,9 +105,12 @@ public class Miner implements Runnable {
 		for (Element element : getProductElements()) {
 			session.beginTransaction();
 
-			Product product = DataRecordNormalizer.extractProduct(element);
-			String productUrl = DataRecordNormalizer.extractProductLink(element);
+			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), retrievedTime);
+			Product product = productPricePair.getFirst();
+			PricePoint pricePoint = productPricePair.getSecond();		
+			String productUrl = DataRecordExtractor.extractProductLink(element);
 
+			// find isbn
 			try {
 				Document singleProductPage = Jsoup.connect(productUrl).get();
 				Matcher isbnMatcher = isbn13Pattern.matcher(singleProductPage.text());
@@ -113,18 +122,24 @@ public class Miner implements Runnable {
 				e.printStackTrace();
 			}
 
+			// Query product
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
 			Root<Product> productRoot = productCriteriaQuery.from(Product.class);
 			productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("title"), product.getTitle()));
 			productCriteriaQuery.select(productRoot);
 
+			// insert product
 			List<Product> products = session.createQuery(productCriteriaQuery).getResultList();
 			if (products.isEmpty()) {
+				product.getPricepoints().add(pricePoint);
 				session.save(product);
-				logger.info("Saved product {} to db.", product);
+				logger.info("Saved new product {} to db.", product);
 			} else {
-				// TODO: add price
+				Product persistedProduct = products.get(0);
+				persistedProduct.getPricepoints().add(pricePoint);
+				session.saveOrUpdate(persistedProduct);
+				logger.info("Updated product {} in db.", persistedProduct);
 			}
 
 			session.getTransaction().commit();

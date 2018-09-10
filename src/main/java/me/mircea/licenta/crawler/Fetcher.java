@@ -2,6 +2,7 @@ package me.mircea.licenta.crawler;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -69,10 +70,11 @@ public class Fetcher implements Runnable {
 		boolean havePagesLeft = true;
 		while (havePagesLeft) {
 			Document doc = getDocumentStripped(driver.getPageSource());
+			Instant retrievedTime = Instant.now();
 			documents.add(doc);
 			logger.info("Got document {}", driver.getCurrentUrl());
 
-			exec.submit(new Miner(doc));
+			exec.submit(new Miner(doc, retrievedTime));
 
 			List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 					"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
