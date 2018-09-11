@@ -1,10 +1,13 @@
 package me.mircea.licenta.crawler;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,17 +36,24 @@ import com.google.common.net.InternetDomainName;
 public class Fetcher implements Runnable {
 	private String startUrl;
 	private String domain;
-	private WebDriver driver;
-	private ExecutorService exec = Executors.newCachedThreadPool();
-
+	private final WebDriver driver;
+	private final ExecutorService exec = Executors.newCachedThreadPool();
+	private final int crawlDelay;
+	
+	private static final String CONFIG_FILENAME = "fetcher.properties";
 	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
-	private static final int CRAWLER_DELAY = 3600;
 
-	public Fetcher(String startUrl) throws MalformedURLException {
+	public Fetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
 		this.domain = getDomainOfUrl(startUrl);
-		System.setProperty("webdriver.gecko.driver", "D:\\geckodriver.exe");
-
+		
+		InputStream configInputStream = getClass().getResourceAsStream(CONFIG_FILENAME);
+		Properties properties = new Properties();
+		properties.load(configInputStream);
+		
+		System.setProperty("webdriver.gecko.driver", properties.getProperty("webdriver_path"));
+		this.crawlDelay = Integer.parseInt(properties.getProperty("crawlDelay"));
+		
 		FirefoxProfile profile = new FirefoxProfile();
 		profile.setPreference("permissions.default.image", 2); // Don't load images
 		profile.setPreference("dom.popup_maximum", 0);
@@ -85,13 +95,14 @@ public class Fetcher implements Runnable {
 			} else
 				havePagesLeft = false;
 
-			Thread.sleep(CRAWLER_DELAY);
+			Thread.sleep(crawlDelay);
 		}
 
 		driver.quit();
 		return documents;
 	}
 
+	// TODO: overlaps with Miner.cleanHtml function
 	private Document getDocumentStripped(String pageSource) {
 		Document doc = Jsoup.parse(pageSource, startUrl);
 		doc.getElementsByTag("style").remove();
@@ -113,7 +124,9 @@ public class Fetcher implements Runnable {
 		try {
 			this.traverseMultiProductPages(startUrl);
 		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			logger.error("Thread was interrupted {}", e.getMessage());
 		}
+		driver.quit();
 	}
 }

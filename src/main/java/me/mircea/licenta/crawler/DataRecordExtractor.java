@@ -3,8 +3,6 @@ package me.mircea.licenta.crawler;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.regex.Pattern;
-
 import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +39,7 @@ public class DataRecordExtractor {
 			logger.warn("Price tag was ill-formated");
 		}
 
-		return new ImmutablePair<Product, PricePoint>(product, pricePoint);
+		return new ImmutablePair<>(product, pricePoint);
 	}
 
 	public static String extractProductLink(Element htmlElement) {

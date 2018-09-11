@@ -119,7 +119,7 @@ public class Miner implements Runnable {
 					logger.info("Found isbn {}", isbn);
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				logger.warn("{}", e);
 			}
 
 			// Query product

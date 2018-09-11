@@ -1,5 +1,7 @@
 package me.mircea.licenta.crawler;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.List;
@@ -25,6 +27,10 @@ public final class CrawlerStart {
 				exec.submit(new Fetcher(startUrl));
 			} catch (MalformedURLException e) {
 				logger.debug("Problem regarding gathering pages: {}.", e.getMessage());
+			} catch (FileNotFoundException | NullPointerException e) {
+				logger.error("Configuration file not found");
+			} catch (IOException e) {
+				logger.warn("Could not read from an input stream");
 			}
 		}
 	}
