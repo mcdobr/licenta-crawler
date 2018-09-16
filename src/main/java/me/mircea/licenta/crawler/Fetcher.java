@@ -40,6 +40,8 @@ public class Fetcher implements Runnable {
 	private String startUrl;
 	private String domain;
 	private final WebDriver driver;
+	
+	//TODO: change back
 	private final ExecutorService exec = Executors.newCachedThreadPool();
 	private final int crawlDelay;
 	

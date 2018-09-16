@@ -3,6 +3,7 @@ package me.mircea.licenta.miner;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -91,10 +92,11 @@ public class Miner implements Runnable {
 	
 	@Override
 	public void run() {
-		HtmlHelper.sanitizeHtml(doc);
+		//HtmlHelper.sanitizeHtml(doc);
 		logger.info("Started mining for products on url {} ...", doc.location());
 		for (Element element : getProductElements()) {
-			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), LocalDate.from(retrievedTime));
+			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), 
+					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate());
 			Product product = productPricePair.getFirst();
 			PricePoint pricePoint = productPricePair.getSecond();		
 			String productUrl = DataRecordExtractor.extractProductLink(element);
