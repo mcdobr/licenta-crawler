@@ -25,6 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.net.InternetDomainName;
 
+import me.mircea.licenta.core.utils.HtmlHelper;
+import me.mircea.licenta.miner.Miner;
+
 /**
  * @author mircea
  * @brief The thinking when designing this class was that a fetcher is a tool
@@ -59,7 +62,7 @@ public class Fetcher implements Runnable {
 		profile.setPreference("dom.popup_maximum", 0);
 		profile.setPreference("privacy.popups.showBrowserMessage", false);
 		FirefoxOptions opts = new FirefoxOptions();
-		opts.setHeadless(true);
+		//opts.setHeadless(true);
 		opts.setProfile(profile);
 
 		this.driver = new FirefoxDriver(opts);
@@ -86,6 +89,7 @@ public class Fetcher implements Runnable {
 
 			exec.submit(new Miner(doc, retrievedTime));
 
+			// Go to next pagination page
 			List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 					"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
 
@@ -101,14 +105,10 @@ public class Fetcher implements Runnable {
 		driver.quit();
 		return documents;
 	}
-
-	// TODO: overlaps with Miner.cleanHtml function
+	
 	private Document getDocumentStripped(String pageSource) {
 		Document doc = Jsoup.parse(pageSource, startUrl);
-		doc.getElementsByTag("style").remove();
-		doc.getElementsByTag("script").remove();
-		doc.select("[style]").removeAttr("style");
-		return doc;
+		return HtmlHelper.sanitizeHtml(doc);
 	}
 
 	private String getDomainOfUrl(String url) throws MalformedURLException {

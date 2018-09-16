@@ -1,13 +1,15 @@
-package me.mircea.licenta.crawler;
+package me.mircea.licenta.miner;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
@@ -23,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
 import me.mircea.licenta.core.utils.HibernateUtil;
+import me.mircea.licenta.core.utils.HtmlHelper;
 import me.mircea.licenta.core.utils.ImmutablePair;
 
 /**
@@ -38,8 +41,7 @@ public class Miner implements Runnable {
 	private Map<Element, Integer> depths;
 	
 	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
-	private static final Pattern isbn13Pattern = Pattern.compile("97(?:8|9)([ -])\\d{1,5}\\1\\d{1,7}\\1\\d{1,6}\\1\\d");
-	private static final Pattern isbn10Pattern = Pattern.compile("");
+
 
 	public Miner(Document doc, Instant retrievedTime) {
 		this.doc = doc;
@@ -79,15 +81,6 @@ public class Miner implements Runnable {
 	 */
 
 	/**
-	 * @brief Remove elements that make the html hard to read.
-	 */
-	private void cleanHtml() {
-		doc.select("style").remove();
-		doc.select("script").remove();
-		doc.getElementsByAttribute("style").removeAttr("style");
-	}
-
-	/**
 	 * @brief Select all leaf nodes that look like a product.
 	 */
 	private Elements getProductElements() {
@@ -95,33 +88,41 @@ public class Miner implements Runnable {
 		return doc.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
 
 	}
-
+	
 	@Override
 	public void run() {
-		logger.info("Started mining for products...");
-
-		cleanHtml();
-		Session session = HibernateUtil.getSessionFactory().openSession();
+		HtmlHelper.sanitizeHtml(doc);
+		logger.info("Started mining for products on url {} ...", doc.location());
 		for (Element element : getProductElements()) {
-			session.beginTransaction();
-
-			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), retrievedTime);
+			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), LocalDate.from(retrievedTime));
 			Product product = productPricePair.getFirst();
 			PricePoint pricePoint = productPricePair.getSecond();		
 			String productUrl = DataRecordExtractor.extractProductLink(element);
 
-			// find isbn
 			try {
 				Document singleProductPage = Jsoup.connect(productUrl).get();
-				Matcher isbnMatcher = isbn13Pattern.matcher(singleProductPage.text());
-				if (isbnMatcher.find()) {
-					String isbn = isbnMatcher.group();
-					logger.info("Found isbn {}", isbn);
+				Map<String, String> productAttributes = DataRecordExtractor.extractProductAttributes(singleProductPage);
+		
+				if (productAttributes.isEmpty())
+					logger.error("AttributesMap is empty on {}", productUrl);
+				for (String author : productAttributes.get("Autor").split(".,")) {
+					product.getAuthors().add(author);
 				}
+				
+				productAttributes.keySet()
+						.stream()
+						.filter(key -> key.contains("ISBN"))
+						.findFirst()
+						.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
+				
 			} catch (IOException e) {
-				logger.warn("{}", e);
+				logger.warn("Could not connect to url: {}", productUrl);
 			}
 
+
+			Session session = HibernateUtil.getSessionFactory().openSession();
+			session.beginTransaction();
+			
 			// Query product
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
@@ -141,10 +142,10 @@ public class Miner implements Runnable {
 				session.saveOrUpdate(persistedProduct);
 				logger.info("Updated product {} in db.", persistedProduct);
 			}
-
+			
 			session.getTransaction().commit();
+			session.close();
 		}
-		session.close();
-		logger.info("Ended mining for products...");
+		logger.info("Ended mining for products on url {}...", doc.location());
 	}
 }
