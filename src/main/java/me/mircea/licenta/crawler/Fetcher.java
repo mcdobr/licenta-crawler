@@ -38,8 +38,8 @@ import me.mircea.licenta.miner.Miner;
 
 // TODO: maybe inherit autoclosable
 public class Fetcher implements Runnable {
-	private String startUrl;
-	private String domain;
+	private final String startUrl;
+	private final String domain;
 	private final WebDriver driver;
 
 	private final ExecutorService exec = Executors.newCachedThreadPool();
@@ -70,10 +70,10 @@ public class Fetcher implements Runnable {
 		this.driver = new FirefoxDriver(opts);
 	}
 
-	public Map<String, Document> getSingleProductPages(Document startPage) {
+	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
 		Map<String, Document> singleProductPages = new HashMap<>();
 
-		Elements singlePageLinks = startPage
+		Elements singlePageLinks = multiProductPage
 				.select("[class*='produ']:has(img):has(a):not(:has([class*='produ']:has(img):has(a))) a[href]");
 		for (Element link : singlePageLinks) {
 			String url = link.absUrl("href");

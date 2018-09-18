@@ -2,16 +2,10 @@ package me.mircea.licenta.miner;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
@@ -40,6 +34,7 @@ import me.mircea.licenta.core.utils.ImmutablePair;
  */
 public class Miner implements Runnable {
 	private final Document doc;
+	//TODO: make it so that you don't get pages anymore from miner
 	private final Map<String, Document> singleProductPages;
 	private final Instant retrievedTime;
 
