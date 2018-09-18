@@ -10,7 +10,7 @@ import org.junit.Test;
 
 public class FetcherTest {
 	@Test
-	public void getProductPages() {
+	public void shouldExtractAllSingleProductPages() {
 		Fetcher fetcher;
 		String url = "http://www.librariilealexandria.ro/carte?limit=24";
 		try {

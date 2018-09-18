@@ -1,6 +1,5 @@
 package me.mircea.licenta.miner;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -10,7 +9,6 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
 import org.hibernate.Session;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -33,55 +31,58 @@ import me.mircea.licenta.core.utils.ImmutablePair;
  *        to correlate and find out details about the product.
  */
 public class Miner implements Runnable {
-	private final Document doc;
-	//TODO: make it so that you don't get pages anymore from miner
+	private final Document multiProductPage;
 	private final Map<String, Document> singleProductPages;
 	private final Instant retrievedTime;
 
 	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
 
 	public Miner(Document doc, Instant retrievedTime, Map<String, Document> singleProductPages) {
-		this.doc = doc;
+		this.multiProductPage = doc;
 		this.retrievedTime = retrievedTime;
 		this.singleProductPages = singleProductPages;
 	}
 
 	private Elements getProductElements() {
 		String productSelector = "[class*='produ']:has(img):has(a)";
-		return doc.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
+		return multiProductPage.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
 	}
 
 	@Override
 	public void run() {
 		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
+		HtmlUtil.sanitizeHtml(multiProductPage);
+		
+		int inserted = 0, updated = 0;
+		
+		final Elements productElements = getProductElements();
+		for (Element productElement : productElements) {
+			final String productUrl = HtmlUtil.extractFirstLinkOfElement(productElement);
 
-		HtmlUtil.sanitizeHtml(doc);
-		logger.info("Started mining for products on url {} ...", doc.location());
-		for (Element productElement : getProductElements()) {
-			ImmutablePair<Product, PricePoint> productPricePair = extractionStrategy.extractProductAndPricePoint(
+			// Handle the product's page
+			final Document singleProductPage = singleProductPages.get(productUrl);
+			final Map<String, String> productAttributes = extractionStrategy.extractProductAttributes(singleProductPage);
+
+			
+			final ImmutablePair<Product, PricePoint> productPricePair = extractionStrategy.extractProductAndPricePoint(
 					productElement, Locale.forLanguageTag("ro-ro"),
 					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate());
-			Product product = productPricePair.getFirst();
-			PricePoint pricePoint = productPricePair.getSecond();
-			String productUrl = HtmlUtil.extractFirstLinkOfElement(productElement);
-
-			try {
-				Document singleProductPage = Jsoup.connect(productUrl).get();
-				Map<String, String> productAttributes = extractionStrategy.extractProductAttributes(singleProductPage);
-
-				if (productAttributes.isEmpty())
-					logger.error("AttributesMap is empty on {}", productUrl);
-				for (String author : productAttributes.get("Autor").split(".,")) {
-					product.getAuthors().add(author);
-				}
-
-				productAttributes.keySet().stream().filter(key -> key.contains("ISBN")).findFirst()
-						.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
-
-			} catch (IOException e) {
-				logger.warn("Could not connect to url: {}", productUrl);
+			
+			final Product product = productPricePair.getFirst();
+			final PricePoint pricePoint = productPricePair.getSecond();
+			
+			
+			if (productAttributes.isEmpty())
+				logger.error("AttributesMap is empty on {}", productUrl);
+			for (String author : productAttributes.get("Autor").split(".,")) {
+				product.getAuthors().add(author);
 			}
 
+			productAttributes.keySet().stream().filter(key -> key.contains("ISBN")).findFirst()
+					.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
+
+
+			// Begin hibernate stuff
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
 
@@ -89,16 +90,30 @@ public class Miner implements Runnable {
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
 			Root<Product> productRoot = productCriteriaQuery.from(Product.class);
-			productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("title"), product.getTitle()));
+			
+			if (product.getIsbn() != null)
+				productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("isbn"), product.getIsbn()));
+			else
+				productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("title"), product.getTitle()));
+			
 			productCriteriaQuery.select(productRoot);
-
-			// insert product
 			List<Product> products = session.createQuery(productCriteriaQuery).getResultList();
+			
+			session.getTransaction().commit();
+			
+			
+			
+			// insert product
+			session.beginTransaction();
 			if (products.isEmpty()) {
+				++inserted;
+				
 				product.getPricepoints().add(pricePoint);
 				session.save(product);
 				logger.info("Saved new product {} to db.", product);
 			} else {
+				++updated;
+				
 				Product persistedProduct = products.get(0);
 				persistedProduct.getPricepoints().add(pricePoint);
 				session.saveOrUpdate(persistedProduct);
@@ -108,6 +123,7 @@ public class Miner implements Runnable {
 			session.getTransaction().commit();
 			session.close();
 		}
-		logger.info("Ended mining for products on url {}...", doc.location());
+		//TODO: setup loggers right
+		logger.error("Found {}/{} products on that page: {} inserted, {} updated.", productElements.size(), singleProductPages.size(), inserted, updated);
 	}
 }
