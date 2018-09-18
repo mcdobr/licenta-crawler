@@ -1,14 +1,20 @@
 package me.mircea.licenta.crawler;
 
-public class FetcherTest 
-{
-	/*
-    @Test
-    public void shouldGetEmptyHashMapOnNull() throws MalformedURLException {
-    	Fetcher fetcher = new Fetcher("");
-    	Map<Element, Integer> depthMap = Miner.getDepthOfTree(null);
-    	
-    	assertNotNull(depthMap);
-    	assertTrue(depthMap.isEmpty());
-    }*/
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+
+import org.junit.Test;
+
+public class FetcherTest {
+	@Test
+	public void getProductPages() {
+		Fetcher fetcher;
+		try {
+			fetcher = new Fetcher("http://www.librariilealexandria.ro/carte?limit=24");
+			assertTrue(false);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }

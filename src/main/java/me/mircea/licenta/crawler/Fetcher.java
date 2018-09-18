@@ -3,17 +3,18 @@ package me.mircea.licenta.crawler;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -23,9 +24,7 @@ import org.openqa.selenium.firefox.FirefoxProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.net.InternetDomainName;
-
-import me.mircea.licenta.core.utils.HtmlHelper;
+import me.mircea.licenta.core.utils.HtmlUtil;
 import me.mircea.licenta.miner.Miner;
 
 /**
@@ -36,60 +35,74 @@ import me.mircea.licenta.miner.Miner;
  *        designed for humans not "robots" and such I should be respectful and
  *        not make parallel requests and make queries with a small time gap.
  */
+
+// TODO: maybe inherit autoclosable
 public class Fetcher implements Runnable {
 	private String startUrl;
 	private String domain;
 	private final WebDriver driver;
-	
-	//TODO: change back
+
 	private final ExecutorService exec = Executors.newCachedThreadPool();
 	private final int crawlDelay;
-	
+
 	private static final String CONFIG_FILENAME = "fetcher.properties";
 	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
 
 	public Fetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
-		this.domain = getDomainOfUrl(startUrl);
-		
+		this.domain = HtmlUtil.getDomainOfUrl(startUrl);
+
 		InputStream configInputStream = getClass().getResourceAsStream(CONFIG_FILENAME);
 		Properties properties = new Properties();
 		properties.load(configInputStream);
-		
+
 		System.setProperty("webdriver.gecko.driver", properties.getProperty("webdriver_path"));
 		this.crawlDelay = Integer.parseInt(properties.getProperty("crawlDelay"));
-		
+
 		FirefoxProfile profile = new FirefoxProfile();
 		profile.setPreference("permissions.default.image", 2); // Don't load images
 		profile.setPreference("dom.popup_maximum", 0);
 		profile.setPreference("privacy.popups.showBrowserMessage", false);
 		FirefoxOptions opts = new FirefoxOptions();
-		//opts.setHeadless(true);
+		// opts.setHeadless(true);
 		opts.setProfile(profile);
 
 		this.driver = new FirefoxDriver(opts);
 	}
 
+	public Map<String, Document> getSingleProductPages(Document startPage) {
+		Map<String, Document> singleProductPages = new HashMap<>();
+
+		Elements singlePageLinks = startPage
+				.select("[class*='produ']:has(img):has(a):not(:has([class*='produ']:has(img):has(a))) a[href]");
+		for (Element link : singlePageLinks) {
+			String url = link.absUrl("href");
+			try {
+				singleProductPages.put(url, Jsoup.connect(url).get());
+			} catch (IOException e) {
+				logger.warn("Could not get page {}", url);
+			}
+		}
+
+		return singleProductPages;
+	}
+
 	/**
 	 * @param startMultiProductPage
 	 *            First page that contains multiple products.
-	 * @return A set of the documents obtained by following pagination links.
 	 * @throws InterruptedException
 	 */
-	public Set<Document> traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException {
-		Set<Document> documents = new HashSet<>();
-
+	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException {
 		String url = startMultiProductPage;
 		driver.get(url);
 
 		boolean havePagesLeft = true;
 		while (havePagesLeft) {
-			Document doc = getDocumentStripped(driver.getPageSource());
+			Document multiProductPage = getDocumentStripped(driver.getPageSource());
 			Instant retrievedTime = Instant.now();
-			documents.add(doc);
 			logger.info("Got document {}", driver.getCurrentUrl());
 
-			exec.submit(new Miner(doc, retrievedTime));
+			exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
 
 			// Go to next pagination page
 			List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
@@ -105,20 +118,15 @@ public class Fetcher implements Runnable {
 		}
 
 		driver.quit();
-		return documents;
-	}
-	
-	private Document getDocumentStripped(String pageSource) {
-		Document doc = Jsoup.parse(pageSource, startUrl);
-		return HtmlHelper.sanitizeHtml(doc);
 	}
 
-	private String getDomainOfUrl(String url) throws MalformedURLException {
-		return InternetDomainName.from(new URL(url).getHost()).topPrivateDomain().toString();
+	private Document getDocumentStripped(String pageSource) {
+		Document doc = Jsoup.parse(pageSource, startUrl);
+		return HtmlUtil.sanitizeHtml(doc);
 	}
 
 	private boolean isWorthVisiting(String url) throws MalformedURLException {
-		return getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
+		return HtmlUtil.getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
 	}
 
 	@Override

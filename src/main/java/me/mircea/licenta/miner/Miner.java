@@ -25,8 +25,10 @@ import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
+import me.mircea.licenta.core.infoextraction.HeuristicalStrategy;
+import me.mircea.licenta.core.infoextraction.InformationExtractionStrategy;
 import me.mircea.licenta.core.utils.HibernateUtil;
-import me.mircea.licenta.core.utils.HtmlHelper;
+import me.mircea.licenta.core.utils.HtmlUtil;
 import me.mircea.licenta.core.utils.ImmutablePair;
 
 /**
@@ -37,94 +39,57 @@ import me.mircea.licenta.core.utils.ImmutablePair;
  *        to correlate and find out details about the product.
  */
 public class Miner implements Runnable {
-	private Document doc;
+	private final Document doc;
+	private final Map<String, Document> singleProductPages;
 	private final Instant retrievedTime;
-	private Map<Element, Integer> depths;
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
 
-
-	public Miner(Document doc, Instant retrievedTime) {
+	public Miner(Document doc, Instant retrievedTime, Map<String, Document> singleProductPages) {
 		this.doc = doc;
 		this.retrievedTime = retrievedTime;
-		this.depths = new HashMap<>();
+		this.singleProductPages = singleProductPages;
 	}
 
-	/*
-	 * private Map<Element, Integer> getDepthOfTree(Element root) {
-	 * getDepthOfSubtree(root, depths); return depths; }
-	 * 
-	 * private void getDepthOfSubtree(Element root, Map<Element, Integer> depths) {
-	 * Elements children = root.children(); if (children.isEmpty()) {
-	 * depths.put(root, 1); } else { for (Element child : children) { if
-	 * (!depths.containsKey(child)) { getDepthOfSubtree(child, depths);
-	 * 
-	 * Integer currentDepth = depths.getOrDefault(root, 1); depths.put(root,
-	 * Math.max(currentDepth, 1 + depths.get(child))); } } } }
-	 * 
-	 * private void compareCombinations(Elements children, final int
-	 * maxInternalTagNodes) { for (int i = 0; i < maxInternalTagNodes; ++i) { for
-	 * (int j = i + 1; j <= maxInternalTagNodes; ++j) { if (i + 2 * j - 1 <
-	 * children.size()) { int start = i; } } } }
-	 */
-	/**
-	 * @brief This function implements the MDR algorithm explained in a paper by
-	 *        Zhai and Liu.
-	 * @param root
-	 *            The starting tag node.
-	 * @param maxInternalTagNodes
-	 *            The maximum number of tag nodes that a generalized tree node can
-	 *            have.
-	 *
-	 *            private void mineDataRegions(Element node, final int
-	 *            maxInternalTagNodes) { if (depths.get(node) >= 3) {
-	 *            compareCombinations(node.children(), maxInternalTagNodes); } }
-	 */
-
-	/**
-	 * @brief Select all leaf nodes that look like a product.
-	 */
 	private Elements getProductElements() {
 		String productSelector = "[class*='produ']:has(img):has(a)";
 		return doc.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
-
 	}
-	
+
 	@Override
 	public void run() {
-		//HtmlHelper.sanitizeHtml(doc);
+		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
+
+		HtmlUtil.sanitizeHtml(doc);
 		logger.info("Started mining for products on url {} ...", doc.location());
-		for (Element element : getProductElements()) {
-			ImmutablePair<Product, PricePoint> productPricePair = DataRecordExtractor.extractProductAndPricePoint(element, Locale.forLanguageTag("ro-ro"), 
+		for (Element productElement : getProductElements()) {
+			ImmutablePair<Product, PricePoint> productPricePair = extractionStrategy.extractProductAndPricePoint(
+					productElement, Locale.forLanguageTag("ro-ro"),
 					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate());
 			Product product = productPricePair.getFirst();
-			PricePoint pricePoint = productPricePair.getSecond();		
-			String productUrl = DataRecordExtractor.extractProductLink(element);
+			PricePoint pricePoint = productPricePair.getSecond();
+			String productUrl = HtmlUtil.extractFirstLinkOfElement(productElement);
 
 			try {
 				Document singleProductPage = Jsoup.connect(productUrl).get();
-				Map<String, String> productAttributes = DataRecordExtractor.extractProductAttributes(singleProductPage);
-		
+				Map<String, String> productAttributes = extractionStrategy.extractProductAttributes(singleProductPage);
+
 				if (productAttributes.isEmpty())
 					logger.error("AttributesMap is empty on {}", productUrl);
 				for (String author : productAttributes.get("Autor").split(".,")) {
 					product.getAuthors().add(author);
 				}
-				
-				productAttributes.keySet()
-						.stream()
-						.filter(key -> key.contains("ISBN"))
-						.findFirst()
+
+				productAttributes.keySet().stream().filter(key -> key.contains("ISBN")).findFirst()
 						.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
-				
+
 			} catch (IOException e) {
 				logger.warn("Could not connect to url: {}", productUrl);
 			}
 
-
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
-			
+
 			// Query product
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
@@ -144,7 +109,7 @@ public class Miner implements Runnable {
 				session.saveOrUpdate(persistedProduct);
 				logger.info("Updated product {} in db.", persistedProduct);
 			}
-			
+
 			session.getTransaction().commit();
 			session.close();
 		}
