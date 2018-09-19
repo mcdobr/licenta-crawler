@@ -43,7 +43,7 @@ public class Miner implements Runnable {
 		this.singleProductPages = singleProductPages;
 	}
 
-	private Elements getProductElements() {
+	public Elements getProductElements() {
 		String productSelector = "[class*='produ']:has(img):has(a)";
 		return multiProductPage.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
 	}
@@ -52,68 +52,68 @@ public class Miner implements Runnable {
 	public void run() {
 		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
 		HtmlUtil.sanitizeHtml(multiProductPage);
-		
+
 		int inserted = 0, updated = 0;
-		
 		final Elements productElements = getProductElements();
 		for (Element productElement : productElements) {
+			logger.info("{}", productElements.size());
 			final String productUrl = HtmlUtil.extractFirstLinkOfElement(productElement);
 
 			// Handle the product's page
 			final Document singleProductPage = singleProductPages.get(productUrl);
-			final Map<String, String> productAttributes = extractionStrategy.extractProductAttributes(singleProductPage);
+			final Map<String, String> productAttributes = extractionStrategy
+					.extractProductAttributes(singleProductPage);
 
-			
 			final ImmutablePair<Product, PricePoint> productPricePair = extractionStrategy.extractProductAndPricePoint(
 					productElement, Locale.forLanguageTag("ro-ro"),
 					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate());
-			
+
 			final Product product = productPricePair.getFirst();
 			final PricePoint pricePoint = productPricePair.getSecond();
-			
-			
+
 			if (productAttributes.isEmpty())
 				logger.error("AttributesMap is empty on {}", productUrl);
-			for (String author : productAttributes.get("Autor").split(".,")) {
-				product.getAuthors().add(author);
+
+			String authors;
+			if ((authors = productAttributes.get("Autor")) != null) {
+				for (String author : authors.split(".,")) {
+					product.getAuthors().add(author);
+				}
 			}
 
 			productAttributes.keySet().stream().filter(key -> key.contains("ISBN")).findFirst()
 					.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
 
+			logger.info("Product {} about to be inserted", product);
 
-			// Begin hibernate stuff
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
-
 			// Query product
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
 			Root<Product> productRoot = productCriteriaQuery.from(Product.class);
-			
+
 			if (product.getIsbn() != null)
 				productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("isbn"), product.getIsbn()));
 			else
 				productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("title"), product.getTitle()));
-			
+
 			productCriteriaQuery.select(productRoot);
 			List<Product> products = session.createQuery(productCriteriaQuery).getResultList();
-			
-			session.getTransaction().commit();
-			
-			
-			
+
+			// session.getTransaction().commit();
+
 			// insert product
-			session.beginTransaction();
+			logger.info("{} to be saved", product.toString());
 			if (products.isEmpty()) {
 				++inserted;
-				
+
 				product.getPricepoints().add(pricePoint);
 				session.save(product);
 				logger.info("Saved new product {} to db.", product);
 			} else {
 				++updated;
-				
+
 				Product persistedProduct = products.get(0);
 				persistedProduct.getPricepoints().add(pricePoint);
 				session.saveOrUpdate(persistedProduct);
@@ -123,7 +123,9 @@ public class Miner implements Runnable {
 			session.getTransaction().commit();
 			session.close();
 		}
-		//TODO: setup loggers right
-		logger.error("Found {}/{} products on that page: {} inserted, {} updated.", productElements.size(), singleProductPages.size(), inserted, updated);
+
+		// TODO: setup loggers right
+		logger.error("Found {}/{} products on that page: {} inserted, {} updated.", productElements.size(),
+				singleProductPages.size(), inserted, updated);
 	}
 }

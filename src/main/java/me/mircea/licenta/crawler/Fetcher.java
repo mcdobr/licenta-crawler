@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -42,7 +43,8 @@ public class Fetcher implements Runnable {
 	private final String domain;
 	private final WebDriver driver;
 
-	private final ExecutorService exec = Executors.newCachedThreadPool();
+	//private final ExecutorService exec = Executors.newSingleThreadExecutor();
+	private final ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 	private final int crawlDelay;
 
 	private static final String CONFIG_FILENAME = "fetcher.properties";
@@ -57,6 +59,9 @@ public class Fetcher implements Runnable {
 		properties.load(configInputStream);
 
 		System.setProperty("webdriver.gecko.driver", properties.getProperty("webdriver_path"));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
+				properties.getProperty("browser_log_file", "browser.log"));
+
 		this.crawlDelay = Integer.parseInt(properties.getProperty("crawlDelay"));
 
 		FirefoxProfile profile = new FirefoxProfile();
@@ -103,20 +108,26 @@ public class Fetcher implements Runnable {
 			logger.info("Got document {}", driver.getCurrentUrl());
 
 			exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			//Thread thr = new Thread(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			//thr.start();
+			
+			havePagesLeft = visitNextPage();
 
-			// Go to next pagination page
-			List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
-					"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
-
-			if (!followingPaginationLink.isEmpty()) {
-				WebElement nextPageLink = followingPaginationLink.get(0);
-				nextPageLink.click();
-			} else
-				havePagesLeft = false;
-
-			Thread.sleep(crawlDelay);
+			//thr.join();
 		}
 
+		driver.quit();
+		// exec.awaitTermination(2, TimeUnit.HOURS);
+	}
+
+	@Override
+	public void run() {
+		try {
+			this.traverseMultiProductPages(startUrl);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			logger.error("Thread was interrupted {}", e.getMessage());
+		}
 		driver.quit();
 	}
 
@@ -129,14 +140,16 @@ public class Fetcher implements Runnable {
 		return HtmlUtil.getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
 	}
 
-	@Override
-	public void run() {
-		try {
-			this.traverseMultiProductPages(startUrl);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			logger.error("Thread was interrupted {}", e.getMessage());
-		}
-		driver.quit();
+	private boolean visitNextPage() throws InterruptedException {
+		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
+				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
+
+		if (!followingPaginationLink.isEmpty()) {
+			WebElement nextPageLink = followingPaginationLink.get(0);
+			nextPageLink.click();
+			Thread.sleep(crawlDelay);
+			return true;
+		} else
+			return false;
 	}
 }
