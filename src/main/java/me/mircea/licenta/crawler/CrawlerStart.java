@@ -16,12 +16,12 @@ public final class CrawlerStart {
 	private static final Logger logger = LoggerFactory.getLogger(CrawlerStart.class);
 
 	public static void main(String[] args) throws InterruptedException {
-		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109",*/
-				"http://www.librariilealexandria.ro/carte"/*,
+		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109?per-page=90",*/
+				"http://www.librariilealexandria.ro/carte?limit=90"/*,
 				"https://www.libris.ro/carti",*/
 				/*"https://www.emag.ro/search/carti"*/);
 
-		ExecutorService exec = Executors.newSingleThreadExecutor();
+		ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 		for (String startUrl : seedList) {
 			try {
 				exec.execute(new Fetcher(startUrl));
@@ -35,6 +35,6 @@ public final class CrawlerStart {
 		}
 
 		//exec.shutdown();
-		//exec.awaitTermination(2, TimeUnit.DAYS);
+		exec.awaitTermination(2, TimeUnit.DAYS);
 	}
 }

@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.jsoup.Jsoup;
@@ -101,6 +103,7 @@ public class Fetcher implements Runnable {
 		String url = startMultiProductPage;
 		driver.get(url);
 
+		List<Future<?>> futures = new ArrayList<>();
 		boolean havePagesLeft = true;
 		while (havePagesLeft) {
 			Document multiProductPage = getDocumentStripped(driver.getPageSource());
@@ -108,12 +111,7 @@ public class Fetcher implements Runnable {
 			logger.info("Got document {}", driver.getCurrentUrl());
 
 			exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
-			//Thread thr = new Thread(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
-			//thr.start();
-			
 			havePagesLeft = visitNextPage();
-
-			//thr.join();
 		}
 
 		driver.quit();
@@ -127,8 +125,9 @@ public class Fetcher implements Runnable {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			logger.error("Thread was interrupted {}", e.getMessage());
+		} finally {
+			driver.quit();
 		}
-		driver.quit();
 	}
 
 	private Document getDocumentStripped(String pageSource) {

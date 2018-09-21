@@ -1,5 +1,6 @@
 package me.mircea.licenta.miner;
 
+import java.net.MalformedURLException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -17,9 +18,10 @@ import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.Product;
+import me.mircea.licenta.core.entities.Site;
 import me.mircea.licenta.core.infoextraction.HeuristicalStrategy;
 import me.mircea.licenta.core.infoextraction.InformationExtractionStrategy;
-import me.mircea.licenta.core.utils.HibernateUtil;
+import me.mircea.licenta.core.productsdb.HibernateUtil;
 import me.mircea.licenta.core.utils.HtmlUtil;
 import me.mircea.licenta.core.utils.ImmutablePair;
 
@@ -48,11 +50,29 @@ public class Miner implements Runnable {
 		return multiProductPage.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
 	}
 
+	//TODO: This method needs refactoring... badly
 	@Override
 	public void run() {
 		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
 		HtmlUtil.sanitizeHtml(multiProductPage);
 
+		
+		Session siteSession = HibernateUtil.getSessionFactory().openSession();
+		siteSession.beginTransaction();
+		
+		Site site = null;
+		try {
+			site = new Site(multiProductPage.baseUri());
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		siteSession.saveOrUpdate(site);
+		
+		siteSession.getTransaction().commit();
+		siteSession.close();
+		
 		int inserted = 0, updated = 0;
 		final Elements productElements = getProductElements();
 		for (Element productElement : productElements) {
@@ -66,7 +86,8 @@ public class Miner implements Runnable {
 
 			final ImmutablePair<Product, PricePoint> productPricePair = extractionStrategy.extractProductAndPricePoint(
 					productElement, Locale.forLanguageTag("ro-ro"),
-					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate());
+					retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate(),
+					site);
 
 			final Product product = productPricePair.getFirst();
 			final PricePoint pricePoint = productPricePair.getSecond();
@@ -84,6 +105,9 @@ public class Miner implements Runnable {
 			productAttributes.keySet().stream().filter(key -> key.contains("ISBN")).findFirst()
 					.ifPresent(key -> product.setIsbn(productAttributes.get(key)));
 
+			product.setDescription(extractionStrategy.extractProductDescription(singleProductPage));
+			
+			
 			logger.info("Product {} about to be inserted", product);
 
 			Session session = HibernateUtil.getSessionFactory().openSession();

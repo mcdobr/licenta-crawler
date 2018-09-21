@@ -13,6 +13,7 @@ public class FetcherTest {
 	public void shouldExtractAllSingleProductPages() {
 		Fetcher fetcher;
 		String url = "http://www.librariilealexandria.ro/carte?limit=24";
+		
 		try {
 			fetcher = new Fetcher(url);
 			
