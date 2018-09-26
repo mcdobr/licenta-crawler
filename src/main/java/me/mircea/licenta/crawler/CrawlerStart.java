@@ -15,26 +15,27 @@ import org.slf4j.LoggerFactory;
 public final class CrawlerStart {
 	private static final Logger logger = LoggerFactory.getLogger(CrawlerStart.class);
 
+	public static ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+	
 	public static void main(String[] args) throws InterruptedException {
-		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109?per-page=90",*/
+		List<String> seedList = Arrays.asList("https://carturesti.ro/raft/carte-109?per-page=90",
 				"http://www.librariilealexandria.ro/carte?limit=90"/*,
-				"https://www.libris.ro/carti",*/
+				"https://www.libris.ro/carti"*//*,
 				/*"https://www.emag.ro/search/carti"*/);
 
-		ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 		for (String startUrl : seedList) {
 			try {
-				exec.execute(new Fetcher(startUrl));
+				executor.execute(new Fetcher(startUrl));
 			} catch (MalformedURLException e) {
 				logger.debug("Problem regarding gathering pages: {}.", e.getMessage());
 			} catch (FileNotFoundException | NullPointerException e) {
-				logger.error("Configuration file not found");
+				logger.error("Configuration file not found. Exception details: {}", e);
 			} catch (IOException e) {
-				logger.warn("Could not read from an input stream");
+				logger.warn("Could not read from an input stream. Exception details: {}", e);
 			}
 		}
 
-		//exec.shutdown();
-		exec.awaitTermination(2, TimeUnit.DAYS);
+		//executor.shutdown();
+		executor.awaitTermination(150, TimeUnit.MINUTES);
 	}
 }
