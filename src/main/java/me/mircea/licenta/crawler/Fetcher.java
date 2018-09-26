@@ -46,7 +46,7 @@ public class Fetcher implements Runnable {
 	private final WebDriver driver;
 
 	//private final ExecutorService exec = Executors.newSingleThreadExecutor();
-	private final ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+	//private final ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 	private final int crawlDelay;
 
 	private static final String CONFIG_FILENAME = "fetcher.properties";
@@ -85,7 +85,8 @@ public class Fetcher implements Runnable {
 		for (Element link : singlePageLinks) {
 			String url = link.absUrl("href");
 			try {
-				singleProductPages.put(url, Jsoup.connect(url).get());
+				Document doc = HtmlUtil.sanitizeHtml(Jsoup.connect(url).get());
+				singleProductPages.put(url, doc);
 			} catch (IOException e) {
 				logger.warn("Could not get page {}", url);
 			}
@@ -110,12 +111,16 @@ public class Fetcher implements Runnable {
 			Instant retrievedTime = Instant.now();
 			logger.info("Got document {}", driver.getCurrentUrl());
 
-			exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			//exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			CrawlerStart.executor.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			
+			//havePagesLeft = false;
 			havePagesLeft = visitNextPage();
 		}
 
 		driver.quit();
-		// exec.awaitTermination(2, TimeUnit.HOURS);
+		//exec.shutdown();
+		//exec.awaitTermination(1, TimeUnit.MINUTES);
 	}
 
 	@Override
