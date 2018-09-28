@@ -84,9 +84,11 @@ public class Miner implements Runnable {
 				++updated;
 
 				Book persistedBook = books.get(0);
-				persistedBook.getPricepoints().add(pricePoint);
-				session.saveOrUpdate(persistedBook);
-				logger.info("Updated book {} in db.", persistedBook);
+				Book mergedBook = Book.merge(persistedBook, book).get();
+				
+				//persistedBook.getPricepoints().add(pricePoint);
+				session.saveOrUpdate(mergedBook);
+				logger.info("Updated book {} in db.", mergedBook);
 			}
 
 			session.getTransaction().commit();
@@ -98,6 +100,10 @@ public class Miner implements Runnable {
 				singleBookPages.size(), inserted, updated);
 	}
 
+	/**
+	 * @param candidate
+	 * @return A list of books containing either one with the same isbn, or other books that have the same name.
+	 */
 	private List<Book> findBookByProperties(Book candidate) {
 		Session session = HibernateUtil.getSessionFactory().openSession();
 		session.beginTransaction();
@@ -143,7 +149,7 @@ public class Miner implements Runnable {
 				site = sites.get(0);
 
 		} catch (MalformedURLException e) {
-			e.printStackTrace();
+			logger.trace("The site was ill-formed {}", e);
 		}
 		
 
