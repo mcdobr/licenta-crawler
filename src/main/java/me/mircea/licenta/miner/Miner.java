@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import me.mircea.licenta.core.entities.PricePoint;
-import me.mircea.licenta.core.entities.Product;
+import me.mircea.licenta.core.entities.Book;
 import me.mircea.licenta.core.entities.Site;
 import me.mircea.licenta.core.infoextraction.HeuristicalStrategy;
 import me.mircea.licenta.core.infoextraction.InformationExtractionStrategy;
@@ -26,67 +26,67 @@ import me.mircea.licenta.db.products.HibernateUtil;
 
 /**
  * @author mircea
- * @brief This class is used to extract products from a (single) given
- *        multi-product page. The intended strategy is to extract the basic
- *        information of the given entry, then using the specific-product page,
- *        to correlate and find out details about the product.
+ * @brief This class is used to extract books from a (single) given
+ *        multi-book page. The intended strategy is to extract the basic
+ *        information of the given entry, then using the specific-book page,
+ *        to correlate and find out details about the book.
  */
 public class Miner implements Runnable {
-	private final Document multiProductPage;
-	private final Map<String, Document> singleProductPages;
+	private final Document multiBookPage;
+	private final Map<String, Document> singleBookPages;
 	private final Instant retrievedTime;
 
 	private static final Logger logger = LoggerFactory.getLogger(Miner.class);
 
-	public Miner(Document doc, Instant retrievedTime, Map<String, Document> singleProductPages) {
-		this.multiProductPage = doc;
+	public Miner(Document doc, Instant retrievedTime, Map<String, Document> singleBookPages) {
+		this.multiBookPage = doc;
 		this.retrievedTime = retrievedTime;
-		this.singleProductPages = singleProductPages;
+		this.singleBookPages = singleBookPages;
 	}
 
-	public Elements getProductElements() {
-		String productSelector = "[class*='produ']:has(img):has(a)";
-		return multiProductPage.select(String.format("%s:not(:has(%s))", productSelector, productSelector));
+	public Elements getBookElements() {
+		String bookSelector = "[class*='produ']:has(img):has(a)";
+		return multiBookPage.select(String.format("%s:not(:has(%s))", bookSelector, bookSelector));
 	}
 
 	// TODO: This method needs refactoring... badly
 	@Override
 	public void run() {
 		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
-		HtmlUtil.sanitizeHtml(multiProductPage);
+		HtmlUtil.sanitizeHtml(multiBookPage);
 		
 		Site site = getPersistedOrCreatedSite();
 		
 		int inserted = 0;
 		int updated = 0;
 
-		final Elements productElements = getProductElements();
-		for (Element productElement : productElements) {
-			final String productUrl = HtmlUtil.extractFirstLinkOfElement(productElement);
-			final Document singleProductPage = singleProductPages.get(productUrl);
+		final Elements bookElements = getBookElements();
+		for (Element bookElement : bookElements) {
+			final String bookUrl = HtmlUtil.extractFirstLinkOfElement(bookElement);
+			final Document singleBookPage = singleBookPages.get(bookUrl);
 
-			final Product product = extractionStrategy.extractProduct(productElement, singleProductPage);
-			final PricePoint pricePoint = extractionStrategy.extractPricePoint(productElement,
+			final Book book = extractionStrategy.extractBook(bookElement, singleBookPage);
+			final PricePoint pricePoint = extractionStrategy.extractPricePoint(bookElement,
 					Locale.forLanguageTag("ro-ro"), retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate(), site);
 
-			List<Product> products = findBookByProperties(product);
+			List<Book> books = findBookByProperties(book);
 
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
 
-			if (products.isEmpty()) {
+			if (books.isEmpty()) {
 				++inserted;
 
-				product.getPricepoints().add(pricePoint);
-				session.save(product);
-				logger.info("Saved new product {} to db.", product);
+				book.getPricepoints().add(pricePoint);
+				session.save(book);
+				logger.info("Saved new book {} to db.", book);
 			} else {
 				++updated;
 
-				Product persistedProduct = products.get(0);
-				persistedProduct.getPricepoints().add(pricePoint);
-				session.saveOrUpdate(persistedProduct);
-				logger.info("Updated product {} in db.", persistedProduct);
+				Book persistedBook = books.get(0);
+				persistedBook.getPricepoints().add(pricePoint);
+				session.saveOrUpdate(persistedBook);
+				logger.info("Updated book {} in db.", persistedBook);
 			}
 
 			session.getTransaction().commit();
@@ -94,30 +94,30 @@ public class Miner implements Runnable {
 		}
 
 		// TODO: setup loggers right
-		logger.error("Found {}/{} products on that page: {} inserted, {} updated.", productElements.size(),
-				singleProductPages.size(), inserted, updated);
+		logger.error("Found {}/{} books on that page: {} inserted, {} updated.", bookElements.size(),
+				singleBookPages.size(), inserted, updated);
 	}
 
-	private List<Product> findBookByProperties(Product candidate) {
+	private List<Book> findBookByProperties(Book candidate) {
 		Session session = HibernateUtil.getSessionFactory().openSession();
 		session.beginTransaction();
 
 		CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
-		CriteriaQuery<Product> productCriteriaQuery = criteriaBuilder.createQuery(Product.class);
-		Root<Product> productRoot = productCriteriaQuery.from(Product.class);
+		CriteriaQuery<Book> bookCriteriaQuery = criteriaBuilder.createQuery(Book.class);
+		Root<Book> bookRoot = bookCriteriaQuery.from(Book.class);
 
 		if (candidate.getIsbn() != null)
-			productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("isbn"), candidate.getIsbn()));
+			bookCriteriaQuery.where(criteriaBuilder.equal(bookRoot.get("isbn"), candidate.getIsbn()));
 		else
-			productCriteriaQuery.where(criteriaBuilder.equal(productRoot.get("title"), candidate.getTitle()));
+			bookCriteriaQuery.where(criteriaBuilder.equal(bookRoot.get("title"), candidate.getTitle()));
 
-		productCriteriaQuery.select(productRoot);
-		List<Product> products = session.createQuery(productCriteriaQuery).getResultList();
+		bookCriteriaQuery.select(bookRoot);
+		List<Book> books = session.createQuery(bookCriteriaQuery).getResultList();
 
 		session.getTransaction().commit();
 		session.close();
 
-		return products;
+		return books;
 	}
 
 	private Site getPersistedOrCreatedSite() {
@@ -128,7 +128,7 @@ public class Miner implements Runnable {
 		Site site = null;
 		try {
 			
-			site = new Site(multiProductPage.baseUri());
+			site = new Site(multiBookPage.baseUri());
 
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 			CriteriaQuery<Site> siteCriteriaQuery = criteriaBuilder.createQuery(Site.class);
