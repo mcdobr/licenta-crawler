@@ -9,6 +9,9 @@ import java.util.Map;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
+
+import org.hibernate.Hibernate;
+import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -69,15 +72,17 @@ public class Miner implements Runnable {
 			final PricePoint pricePoint = extractionStrategy.extractPricePoint(bookElement,
 					Locale.forLanguageTag("ro-ro"), retrievedTime.atZone(ZoneId.systemDefault()).toLocalDate(), site);
 
-			List<Book> books = findBookByProperties(book);
 
 			Session session = HibernateUtil.getSessionFactory().openSession();
 			session.beginTransaction();
+			
+			List<Book> books = findBookByProperties(book, session);
+
+			book.getPricepoints().add(pricePoint);
+
 
 			if (books.isEmpty()) {
 				++inserted;
-
-				book.getPricepoints().add(pricePoint);
 				session.save(book);
 				logger.info("Saved new book {} to db.", book);
 			} else {
@@ -86,8 +91,7 @@ public class Miner implements Runnable {
 				Book persistedBook = books.get(0);
 				Book mergedBook = Book.merge(persistedBook, book).get();
 				
-				//persistedBook.getPricepoints().add(pricePoint);
-				session.saveOrUpdate(mergedBook);
+				session.merge(mergedBook);
 				logger.info("Updated book {} in db.", mergedBook);
 			}
 
@@ -101,13 +105,13 @@ public class Miner implements Runnable {
 	}
 
 	/**
+	 * Works only in a session.
 	 * @param candidate
+	 * @param session2 
 	 * @return A list of books containing either one with the same isbn, or other books that have the same name.
 	 */
-	private List<Book> findBookByProperties(Book candidate) {
-		Session session = HibernateUtil.getSessionFactory().openSession();
-		session.beginTransaction();
-
+	private List<Book> findBookByProperties(Book candidate, Session session) {
+		
 		CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 		CriteriaQuery<Book> bookCriteriaQuery = criteriaBuilder.createQuery(Book.class);
 		Root<Book> bookRoot = bookCriteriaQuery.from(Book.class);
@@ -119,9 +123,6 @@ public class Miner implements Runnable {
 
 		bookCriteriaQuery.select(bookRoot);
 		List<Book> books = session.createQuery(bookCriteriaQuery).getResultList();
-
-		session.getTransaction().commit();
-		session.close();
 
 		return books;
 	}

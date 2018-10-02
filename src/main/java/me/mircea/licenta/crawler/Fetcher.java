@@ -111,10 +111,12 @@ public class Fetcher implements Runnable {
 			//exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
 			CrawlerStart.executor.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
 			
+			//driver.findElements(By.cssSelector("div.modal")).re
+			
 			//havePagesLeft = false;
 			havePagesLeft = visitNextPage();
 		}
-
+		//
 		driver.quit();
 		//exec.shutdown();
 		//exec.awaitTermination(1, TimeUnit.MINUTES);
@@ -145,6 +147,7 @@ public class Fetcher implements Runnable {
 		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
 
+		//driver.findElement(By.xpath("*[@id=\"xClose\"]")).click();
 		if (!followingPaginationLink.isEmpty()) {
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			nextPageLink.click();
