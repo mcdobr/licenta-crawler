@@ -18,10 +18,13 @@ public final class CrawlerStart {
 	public static ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 	
 	public static void main(String[] args) throws InterruptedException {
-		List<String> seedList = Arrays.asList(/*"https://carturesti.ro/raft/carte-109?per-page=90",*/
-				"http://www.librariilealexandria.ro/carte?limit=90"/*,
-				"https://www.libris.ro/carti"*//*,
-				/*"https://www.emag.ro/search/carti"*/);
+		List<String> seedList = Arrays.asList(//"https://carturesti.ro/raft/carte-109?per-page=90",
+				//"http://www.librariilealexandria.ro/carte?limit=90",
+				"https://www.libris.ro/carti"
+				);
+		
+		
+				//"https://www.emag.ro/search/carti"
 
 		for (String startUrl : seedList) {
 			try {

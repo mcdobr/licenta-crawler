@@ -1,11 +1,13 @@
 package me.mircea.licenta.crawler;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.Set;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.junit.Test;
 
 public class FetcherTest {
@@ -23,4 +25,13 @@ public class FetcherTest {
 			e.printStackTrace();
 		}
 	}
+	
+	@Test
+	public void shouldContainPopUp() throws IOException {
+		Document doc = Jsoup.connect("https://www.libris.ro/carti").get();
+		
+		assertNotNull(doc.selectFirst(".NewsClose"));
+		
+	}
+	
 }

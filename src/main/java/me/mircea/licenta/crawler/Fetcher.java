@@ -10,17 +10,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.By;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,9 +115,8 @@ public class Fetcher implements Runnable {
 			//exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
 			CrawlerStart.executor.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
 			
-			//driver.findElements(By.cssSelector("div.modal")).re
+			closePopups();
 			
-			//havePagesLeft = false;
 			havePagesLeft = visitNextPage();
 		}
 		//
@@ -146,14 +149,36 @@ public class Fetcher implements Runnable {
 	private boolean visitNextPage() throws InterruptedException {
 		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
-
-		//driver.findElement(By.xpath("*[@id=\"xClose\"]")).click();
+		
 		if (!followingPaginationLink.isEmpty()) {
 			WebElement nextPageLink = followingPaginationLink.get(0);
+			
+			waitForElementToAppear(nextPageLink, 2, "Pagination link was not visible in 2 seconds");
 			nextPageLink.click();
 			Thread.sleep(crawlDelay);
 			return true;
 		} else
 			return false;
+	}
+	
+	/**
+	 * Close popups if they exist
+	 */
+	private void closePopups() {
+		List<WebElement> popups = driver.findElements(By.cssSelector(".NewsClose[onclick]"));
+		if (!popups.isEmpty()) {
+			for (WebElement popup : popups) {
+				try {
+					popup.click();
+				} catch (StaleElementReferenceException e) {
+					logger.debug("Clicked popup reference went stale.");
+				}
+			}
+		}
+	}
+	
+	private void waitForElementToAppear(WebElement element, long timeOutInSeconds, String timeoutMessage) {
+		WebDriverWait wait = new WebDriverWait(driver, timeOutInSeconds);
+		wait.until(ExpectedConditions.visibilityOf(element));
 	}
 }
