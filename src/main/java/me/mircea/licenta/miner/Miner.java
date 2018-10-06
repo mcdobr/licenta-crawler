@@ -84,7 +84,7 @@ public class Miner implements Runnable {
 			if (books.isEmpty()) {
 				++inserted;
 				session.save(book);
-				logger.info("Saved new book {} to db.", book);
+				logger.info("Saved new {} to db.", book);
 			} else {
 				++updated;
 
@@ -92,7 +92,7 @@ public class Miner implements Runnable {
 				Book mergedBook = Book.merge(persistedBook, book).get();
 				
 				session.merge(mergedBook);
-				logger.info("Updated book {} in db.", mergedBook);
+				logger.info("Updated {} in db.", mergedBook);
 			}
 
 			session.getTransaction().commit();

@@ -17,7 +17,9 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Cookie;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.UnexpectedAlertBehaviour;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -42,17 +44,25 @@ import me.mircea.licenta.miner.Miner;
 
 // TODO: maybe inherit autoclosable
 public class Fetcher implements Runnable {
+	private static final String CONFIG_FILENAME = "fetcher.properties";
+	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
+	private static final Map<String, Cookie> domainCookies = new HashMap<>();
+	
+	static {
+		Cookie librisModalCookie = new Cookie.Builder("GCLIDSEEN", "whatever")
+				.domain("libris.ro")
+				.build();
+		
+		domainCookies.put(librisModalCookie.getDomain(), librisModalCookie);
+	}
+	
 	private final String startUrl;
 	private final String domain;
 	private final WebDriver driver;
-
-	//private final ExecutorService exec = Executors.newSingleThreadExecutor();
-	//private final ExecutorService exec = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 	private final int crawlDelay;
 
-	private static final String CONFIG_FILENAME = "fetcher.properties";
-	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
-
+	
+	
 	public Fetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
 		this.domain = HtmlUtil.getDomainOfUrl(startUrl);
@@ -74,8 +84,9 @@ public class Fetcher implements Runnable {
 		FirefoxOptions opts = new FirefoxOptions();
 		// opts.setHeadless(true);
 		opts.setProfile(profile);
-
+		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
+		
 	}
 
 	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
@@ -100,29 +111,27 @@ public class Fetcher implements Runnable {
 	 * @param startMultiProductPage
 	 *            First page that contains multiple products.
 	 * @throws InterruptedException
+	 * @throws MalformedURLException 
 	 */
-	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException {
+	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException, MalformedURLException {
 		String url = startMultiProductPage;
 		driver.get(url);
-
-		List<Future<?>> futures = new ArrayList<>();
+		
+		Cookie cookie = domainCookies.get(this.domain);
+		if(cookie != null)
+			driver.manage().addCookie(cookie);
+		
 		boolean havePagesLeft = true;
 		while (havePagesLeft) {
 			Document multiProductPage = getDocumentStripped(driver.getPageSource());
 			Instant retrievedTime = Instant.now();
 			logger.info("Got document {}", driver.getCurrentUrl());
-
-			//exec.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			
 			CrawlerStart.executor.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
-			
-			closePopups();
-			
 			havePagesLeft = visitNextPage();
 		}
 		//
 		driver.quit();
-		//exec.shutdown();
-		//exec.awaitTermination(1, TimeUnit.MINUTES);
 	}
 
 	@Override
@@ -132,6 +141,8 @@ public class Fetcher implements Runnable {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			logger.error("Thread was interrupted {}", e.getMessage());
+		} catch (MalformedURLException e) {
+			logger.error("Start url was malformed {}", e.getMessage());
 		} finally {
 			driver.quit();
 		}
@@ -153,7 +164,7 @@ public class Fetcher implements Runnable {
 		if (!followingPaginationLink.isEmpty()) {
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			
-			waitForElementToAppear(nextPageLink, 2, "Pagination link was not visible in 2 seconds");
+			waitForElementToAppear(nextPageLink, 10, "Pagination link was not visible in 10 seconds");
 			nextPageLink.click();
 			Thread.sleep(crawlDelay);
 			return true;
@@ -175,6 +186,7 @@ public class Fetcher implements Runnable {
 				}
 			}
 		}
+		logger.error("Closed the popups");
 	}
 	
 	private void waitForElementToAppear(WebElement element, long timeOutInSeconds, String timeoutMessage) {
