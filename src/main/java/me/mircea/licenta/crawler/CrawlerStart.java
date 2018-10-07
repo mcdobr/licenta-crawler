@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 public final class CrawlerStart {
 	private static final Logger logger = LoggerFactory.getLogger(CrawlerStart.class);
 	
-	public static ExecutorService executor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors());
+	public static final ExecutorService executor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors());
 	
 	public static void main(String[] args) throws InterruptedException {
 		List<String> seedList = Arrays.asList(

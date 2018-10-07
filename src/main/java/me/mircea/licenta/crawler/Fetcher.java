@@ -4,13 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -18,7 +15,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
-import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.UnexpectedAlertBehaviour;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -170,23 +166,6 @@ public class Fetcher implements Runnable {
 			return true;
 		} else
 			return false;
-	}
-	
-	/**
-	 * Close popups if they exist
-	 */
-	private void closePopups() {
-		List<WebElement> popups = driver.findElements(By.cssSelector(".NewsClose[onclick]"));
-		if (!popups.isEmpty()) {
-			for (WebElement popup : popups) {
-				try {
-					popup.click();
-				} catch (StaleElementReferenceException e) {
-					logger.debug("Clicked popup reference went stale.");
-				}
-			}
-		}
-		logger.error("Closed the popups");
 	}
 	
 	private void waitForElementToAppear(WebElement element, long timeOutInSeconds, String timeoutMessage) {
