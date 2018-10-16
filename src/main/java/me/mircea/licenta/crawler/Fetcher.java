@@ -26,6 +26,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import me.mircea.licenta.core.utils.CssUtil;
 import me.mircea.licenta.core.utils.HtmlUtil;
 import me.mircea.licenta.miner.Miner;
 
@@ -56,8 +57,6 @@ public class Fetcher implements Runnable {
 	private final String domain;
 	private final WebDriver driver;
 	private final int crawlDelay;
-
-	
 	
 	public Fetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
@@ -87,10 +86,14 @@ public class Fetcher implements Runnable {
 
 	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
 		Map<String, Document> singleProductPages = new HashMap<>();
-
-		Elements singlePageLinks = multiProductPage
-				.select("[class*='produ']:has(img):has(a):not(:has([class*='produ']:has(img):has(a))) a[href]");
-		for (Element link : singlePageLinks) {
+		
+		Elements singleBookElements = multiProductPage.select(CssUtil.makeLeafOfSelector("[class*='produ']:has(img):has(a)"));
+		Elements links = new Elements();
+		singleBookElements.stream().forEach(bookElement -> links.add(bookElement.selectFirst("a[href]")));
+		
+		// Elements singlePageLinks = multiProductPage.select("[class*='produ']:has(img):has(a):not(:has([class*='produ']:has(img):has(a))) a[href]");
+		//TODO: should retry if exception, maybe just timeout?
+		for (Element link : links) {
 			String url = link.absUrl("href");
 			try {
 				Document doc = HtmlUtil.sanitizeHtml(Jsoup.connect(url).get());
@@ -162,6 +165,7 @@ public class Fetcher implements Runnable {
 			
 			waitForElementToAppear(nextPageLink, 10, "Pagination link was not visible in 10 seconds");
 			nextPageLink.click();
+			//TODO: maybe implicit wait
 			Thread.sleep(crawlDelay);
 			return true;
 		} else

@@ -10,8 +10,6 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
 
-import org.hibernate.Hibernate;
-import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -52,7 +50,6 @@ public class Miner implements Runnable {
 		return multiBookPage.select(String.format("%s:not(:has(%s))", bookSelector, bookSelector));
 	}
 
-	// TODO: This method needs refactoring... badly
 	@Override
 	public void run() {
 		InformationExtractionStrategy extractionStrategy = new HeuristicalStrategy();
