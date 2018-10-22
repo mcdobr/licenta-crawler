@@ -3,6 +3,7 @@ package me.mircea.licenta.crawler;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -86,21 +87,32 @@ public class Fetcher implements Runnable {
 
 	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
 		Map<String, Document> singleProductPages = new HashMap<>();
-		
 		Elements singleBookElements = multiProductPage.select(CssUtil.makeLeafOfSelector("[class*='produ']:has(img):has(a)"));
 		Elements links = new Elements();
 		singleBookElements.stream().forEach(bookElement -> links.add(bookElement.selectFirst("a[href]")));
 		
-		// Elements singlePageLinks = multiProductPage.select("[class*='produ']:has(img):has(a):not(:has([class*='produ']:has(img):has(a))) a[href]");
-		//TODO: should retry if exception, maybe just timeout?
 		for (Element link : links) {
 			String url = link.absUrl("href");
-			try {
-				Document doc = HtmlUtil.sanitizeHtml(Jsoup.connect(url).get());
-				singleProductPages.put(url, doc);
-			} catch (IOException e) {
-				logger.warn("Could not get page {}", url);
+			
+			final int MAX_TRIES = 1;
+			Document bookPage = null;
+			for (int i = 0; i < MAX_TRIES; ++i) {
+				try {
+					bookPage = HtmlUtil.sanitizeHtml(Jsoup.connect(url).get());
+					break;
+				} catch (SocketTimeoutException e) {
+					logger.warn("Socket timed out on {}", url);
+				} catch (IOException e) {
+					logger.warn("Could not get page {}", url);
+				}
 			}
+			
+			if (bookPage != null) {
+				singleProductPages.put(url, bookPage);
+			} else {
+				logger.warn("Could not get page {} after {} tries", url, MAX_TRIES);
+			}
+			
 		}
 
 		return singleProductPages;
@@ -112,7 +124,7 @@ public class Fetcher implements Runnable {
 	 * @throws InterruptedException
 	 * @throws MalformedURLException 
 	 */
-	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException, MalformedURLException {
+	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException {
 		String url = startMultiProductPage;
 		driver.get(url);
 		
@@ -140,8 +152,6 @@ public class Fetcher implements Runnable {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			logger.error("Thread was interrupted {}", e.getMessage());
-		} catch (MalformedURLException e) {
-			logger.error("Start url was malformed {}", e.getMessage());
 		} finally {
 			driver.quit();
 		}

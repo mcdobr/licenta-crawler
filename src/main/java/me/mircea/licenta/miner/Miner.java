@@ -6,6 +6,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
@@ -74,9 +76,7 @@ public class Miner implements Runnable {
 			session.beginTransaction();
 			
 			List<Book> books = findBookByProperties(book, session);
-
 			book.getPricepoints().add(pricePoint);
-
 
 			if (books.isEmpty()) {
 				++inserted;
@@ -86,10 +86,12 @@ public class Miner implements Runnable {
 				++updated;
 
 				Book persistedBook = books.get(0);
-				Book mergedBook = Book.merge(persistedBook, book).get();
+				Optional<Book> mergedBook = Book.merge(persistedBook, book);
 				
-				session.merge(mergedBook);
-				logger.info("Updated {} in db.", mergedBook);
+				if (mergedBook.isPresent()) {
+					session.merge(mergedBook.get());
+					logger.info("Updated {} in db.", mergedBook.get());
+				}
 			}
 
 			session.getTransaction().commit();
@@ -97,8 +99,8 @@ public class Miner implements Runnable {
 		}
 
 		// TODO: setup loggers right
-		logger.error("Found {}/{} books on that page: {} inserted, {} updated.", bookElements.size(),
-				singleBookPages.size(), inserted, updated);
+		logger.error("Found {}/{} books on {} : {} inserted, {} updated.", bookElements.size(),
+				singleBookPages.size(), multiBookPage.absUrl("href"), inserted, updated);
 	}
 
 	/**
@@ -107,8 +109,7 @@ public class Miner implements Runnable {
 	 * @param session2 
 	 * @return A list of books containing either one with the same isbn, or other books that have the same name.
 	 */
-	private List<Book> findBookByProperties(Book candidate, Session session) {
-		
+	private List<Book> findBookByProperties(Book candidate, Session session) {	
 		CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
 		CriteriaQuery<Book> bookCriteriaQuery = criteriaBuilder.createQuery(Book.class);
 		Root<Book> bookRoot = bookCriteriaQuery.from(Book.class);
@@ -119,13 +120,10 @@ public class Miner implements Runnable {
 			bookCriteriaQuery.where(criteriaBuilder.equal(bookRoot.get("title"), candidate.getTitle()));
 
 		bookCriteriaQuery.select(bookRoot);
-		List<Book> books = session.createQuery(bookCriteriaQuery).getResultList();
-
-		return books;
+		return session.createQuery(bookCriteriaQuery).getResultList();
 	}
 
 	private Site getPersistedOrCreatedSite() {
-		
 		Session session = HibernateUtil.getSessionFactory().openSession();
 		session.beginTransaction();
 		

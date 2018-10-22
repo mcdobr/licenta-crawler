@@ -20,7 +20,7 @@ public final class CrawlerStart {
 	public static void main(String[] args) throws InterruptedException {
 		List<String> seedList = Arrays.asList(
 				"https://carturesti.ro/raft/carte-109?per-page=90",
-				"http://www.librariilealexandria.ro/carte?limit=90",
+				"http://www.librariilealexandria.ro/carte",
 				"https://www.libris.ro/carti"
 				);
 		
