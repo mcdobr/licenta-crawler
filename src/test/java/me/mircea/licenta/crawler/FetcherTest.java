@@ -13,13 +13,13 @@ import org.junit.Test;
 public class FetcherTest {
 	@Test
 	public void shouldExtractAllSingleProductPages() {
-		Fetcher fetcher;
+		BrowserFetcher browserFetcher;
 		String url = "http://www.librariilealexandria.ro/carte?limit=24";
 		
 		try {
-			fetcher = new Fetcher(url);
+			browserFetcher = new BrowserFetcher(url);
 			
-			Set<String> urls = fetcher.getSingleProductPages(Jsoup.connect(url).get()).keySet();
+			Set<String> urls = browserFetcher.getSingleProductPages(Jsoup.connect(url).get()).keySet();
 			assertTrue(24 <= urls.size());
 		} catch (IOException e) {
 			e.printStackTrace();

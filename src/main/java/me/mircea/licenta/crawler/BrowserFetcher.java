@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -41,9 +42,9 @@ import me.mircea.licenta.miner.Miner;
  */
 
 // TODO: maybe inherit autoclosable
-public class Fetcher implements Runnable {
+public class BrowserFetcher implements Runnable {
 	private static final String CONFIG_FILENAME = "fetcher.properties";
-	private static final Logger logger = LoggerFactory.getLogger(Fetcher.class);
+	private static final Logger logger = LoggerFactory.getLogger(BrowserFetcher.class);
 	private static final Map<String, Cookie> domainCookies = new HashMap<>();
 	
 	static {
@@ -59,11 +60,11 @@ public class Fetcher implements Runnable {
 	private final WebDriver driver;
 	private final int crawlDelay;
 	
-	public Fetcher(String startUrl) throws IOException {
+	public BrowserFetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
 		this.domain = HtmlUtil.getDomainOfUrl(startUrl);
 
-		InputStream configInputStream = getClass().getResourceAsStream(CONFIG_FILENAME);
+		InputStream configInputStream = getClass().getResourceAsStream("/" + CONFIG_FILENAME);
 		Properties properties = new Properties();
 		properties.load(configInputStream);
 
@@ -82,6 +83,7 @@ public class Fetcher implements Runnable {
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
+		this.driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
 		
 	}
 
@@ -124,7 +126,7 @@ public class Fetcher implements Runnable {
 	 * @throws InterruptedException
 	 * @throws MalformedURLException 
 	 */
-	public void traverseMultiProductPages(final String startMultiProductPage) throws InterruptedException {
+	public void traverseMultiProductPages(final String startMultiProductPage) {
 		String url = startMultiProductPage;
 		driver.get(url);
 		
@@ -144,46 +146,32 @@ public class Fetcher implements Runnable {
 		//
 		driver.quit();
 	}
-
-	@Override
-	public void run() {
-		try {
-			this.traverseMultiProductPages(startUrl);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			logger.error("Thread was interrupted {}", e.getMessage());
-		} finally {
-			driver.quit();
-		}
-	}
-
-	private Document getDocumentStripped(String pageSource) {
-		Document doc = Jsoup.parse(pageSource, startUrl);
-		return HtmlUtil.sanitizeHtml(doc);
-	}
-
-	private boolean isWorthVisiting(String url) throws MalformedURLException {
-		return HtmlUtil.getDomainOfUrl(url).equals(domain) && url.startsWith(startUrl);
-	}
-
-	private boolean visitNextPage() throws InterruptedException {
+	
+	private boolean visitNextPage() {
 		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
 		
 		if (!followingPaginationLink.isEmpty()) {
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			
-			waitForElementToAppear(nextPageLink, 10, "Pagination link was not visible in 10 seconds");
+			WebDriverWait clickWait = new WebDriverWait(driver, 20);
+			clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
+
+			
 			nextPageLink.click();
-			//TODO: maybe implicit wait
-			Thread.sleep(crawlDelay);
 			return true;
 		} else
 			return false;
 	}
-	
-	private void waitForElementToAppear(WebElement element, long timeOutInSeconds, String timeoutMessage) {
-		WebDriverWait wait = new WebDriverWait(driver, timeOutInSeconds);
-		wait.until(ExpectedConditions.visibilityOf(element));
+
+	@Override
+	public void run() {
+		this.traverseMultiProductPages(startUrl);
+		driver.quit();
+	}
+
+	private Document getDocumentStripped(String pageSource) {
+		Document doc = Jsoup.parse(pageSource, startUrl);
+		return HtmlUtil.sanitizeHtml(doc);
 	}
 }

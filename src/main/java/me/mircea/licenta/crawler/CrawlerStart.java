@@ -27,7 +27,7 @@ public final class CrawlerStart {
 		
 		for (String startUrl : seedList) {
 			try {
-				executor.execute(new Fetcher(startUrl));
+				executor.execute(new BrowserFetcher(startUrl));
 			} catch (MalformedURLException e) {
 				logger.debug("Problem regarding gathering pages: {}.", e.getMessage());
 			} catch (FileNotFoundException | NullPointerException e) {
