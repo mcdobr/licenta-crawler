@@ -23,8 +23,7 @@ public final class CrawlerStart {
 				"http://www.librariilealexandria.ro/carte",
 				"https://www.libris.ro/carti"
 				);
-		
-		
+
 		for (String startUrl : seedList) {
 			try {
 				executor.execute(new BrowserFetcher(startUrl));
@@ -37,7 +36,7 @@ public final class CrawlerStart {
 			}
 		}
 
-		//executor.shutdown();
+		// executor.shutdown();
 		executor.awaitTermination(150, TimeUnit.MINUTES);
 	}
 }
