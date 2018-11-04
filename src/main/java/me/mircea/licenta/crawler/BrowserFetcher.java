@@ -140,7 +140,14 @@ public class BrowserFetcher implements Runnable {
 			Instant retrievedTime = Instant.now();
 			logger.info("Got document {}", driver.getCurrentUrl());
 			
-			CrawlerStart.executor.submit(new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage)));
+			try {
+				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage));
+				CrawlerStart.executor.submit(miner);
+			} catch (MalformedURLException e) {
+				logger.debug("Could not start extracting because of corrupt urls {}", e);
+			}
+			
+			
 			havePagesLeft = visitNextPage();
 		}
 		//
