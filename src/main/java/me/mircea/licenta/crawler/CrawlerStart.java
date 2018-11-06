@@ -2,11 +2,8 @@ package me.mircea.licenta.crawler;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.MalformedURLException;
-import java.time.Instant;
 import java.util.Arrays;
-import java.util.Currency;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,16 +14,12 @@ import org.slf4j.LoggerFactory;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
-import com.googlecode.objectify.Key;
 import com.googlecode.objectify.ObjectifyFactory;
 import com.googlecode.objectify.ObjectifyService;
-import com.googlecode.objectify.Work;
-import com.googlecode.objectify.impl.translate.opt.joda.ReadableInstantTranslatorFactory;
-
 import me.mircea.licenta.core.entities.Book;
-import me.mircea.licenta.core.entities.InstantTranslatorFactory;
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.WebWrapper;
+import me.mircea.licenta.db.products.InstantTranslatorFactory;
 
 
 public final class CrawlerStart {
@@ -46,29 +39,6 @@ public final class CrawlerStart {
 		ObjectifyService.register(Book.class);
 		ObjectifyService.register(PricePoint.class);
 		ObjectifyService.register(WebWrapper.class);
-		
-		Book book = new Book();
-		book.setTitle("Anna Karenina");
-		book.setIsbn("9781234567890");
-		book.setAuthors(Arrays.asList("Lev Tolstoi", "Homer Simpson"));
-		
-		ObjectifyService.run(new Work<Key<Book>>() {
-			@Override
-			public Key<Book> run() {
-				Key<Book> bookKey = ObjectifyService.ofy().save().entity(book).now();
-				
-				try {
-					PricePoint p1 = new PricePoint(BigDecimal.valueOf(23.05), Currency.getInstance("RON"), Instant.now(), "http://dummyUrl.com");
-					p1.book = bookKey;
-					ObjectifyService.ofy().save().entity(p1).now();
-				} catch (MalformedURLException e) {
-					e.printStackTrace();
-				}
-				
-				return null;
-			}
-		});
-		
 		
 		List<String> seedList = Arrays.asList(
 				"https://carturesti.ro/raft/carte-109?per-page=90",

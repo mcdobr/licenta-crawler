@@ -101,7 +101,9 @@ public class Miner implements Runnable {
 			final PricePoint pricePoint = strategy.extractPricePoint(bookElement, Locale.forLanguageTag("ro-ro"), retrievedTime);
 
 			List<Book> books = findBookByProperties(book);
-			book.getPricepoints().add(pricePoint);
+			Key<PricePoint> priceKey = ObjectifyService.ofy().save().entity(pricePoint).now();
+			
+			book.getPricepoints().add(priceKey);
 			
 			if (books.isEmpty()) {
 				++inserted;
