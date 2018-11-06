@@ -9,16 +9,28 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import javax.money.CurrencyUnit;
+import javax.money.Monetary;
+import javax.money.MonetaryAmount;
+import javax.money.MonetaryAmountFactory;
+import javax.money.MonetaryContext;
+import javax.money.NumberValue;
+import javax.money.format.MonetaryAmountFormat;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
+import com.google.type.Money;
 import com.googlecode.objectify.ObjectifyFactory;
 import com.googlecode.objectify.ObjectifyService;
+import com.googlecode.objectify.impl.translate.opt.BigDecimalLongTranslatorFactory;
+
 import me.mircea.licenta.core.entities.Book;
 import me.mircea.licenta.core.entities.PricePoint;
 import me.mircea.licenta.core.entities.WebWrapper;
+import me.mircea.licenta.db.products.CurrencyTranslatorFactory;
 import me.mircea.licenta.db.products.InstantTranslatorFactory;
 
 
@@ -35,10 +47,22 @@ public final class CrawlerStart {
 		ObjectifyService.init(new ObjectifyFactory(datastore));
 		
 		ObjectifyService.factory().getTranslators().add(new InstantTranslatorFactory());
+		ObjectifyService.factory().getTranslators().add(new CurrencyTranslatorFactory());
+		ObjectifyService.factory().getTranslators().add(new BigDecimalLongTranslatorFactory(100));
+		
 		//new ReadableInstantTranslatorFactory();
 		ObjectifyService.register(Book.class);
 		ObjectifyService.register(PricePoint.class);
 		ObjectifyService.register(WebWrapper.class);
+		
+		/*
+		MonetaryAmount ma = Monetary.getDefaultAmountFactory()
+				.setCurrency("RON")
+				.setNumber(20)
+				.create();
+		
+		Money.parser().parseFrom*/
+		
 		
 		List<String> seedList = Arrays.asList(
 				"https://carturesti.ro/raft/carte-109?per-page=90",
