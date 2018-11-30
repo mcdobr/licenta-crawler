@@ -8,15 +8,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import javax.money.CurrencyUnit;
-import javax.money.Monetary;
-import javax.money.MonetaryAmount;
-import javax.money.MonetaryAmountFactory;
-import javax.money.MonetaryContext;
-import javax.money.NumberValue;
-import javax.money.format.MonetaryAmountFormat;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,20 +41,10 @@ public final class CrawlerStart {
 		ObjectifyService.factory().getTranslators().add(new CurrencyTranslatorFactory());
 		ObjectifyService.factory().getTranslators().add(new BigDecimalLongTranslatorFactory(100));
 		
-		//new ReadableInstantTranslatorFactory();
 		ObjectifyService.register(Book.class);
 		ObjectifyService.register(PricePoint.class);
 		ObjectifyService.register(WebWrapper.class);
-		
-		/*
-		MonetaryAmount ma = Monetary.getDefaultAmountFactory()
-				.setCurrency("RON")
-				.setNumber(20)
-				.create();
-		
-		Money.parser().parseFrom*/
-		
-		
+
 		List<String> seedList = Arrays.asList(
 				"https://carturesti.ro/raft/carte-109?per-page=90",
 				"http://www.librariilealexandria.ro/carte",
@@ -81,8 +62,15 @@ public final class CrawlerStart {
 				logger.warn("Could not read from an input stream. Exception details: {}", e);
 			}
 		}
-
-		// executor.shutdown();
-		executor.awaitTermination(150, TimeUnit.MINUTES);
+		
+		if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+			executor.shutdownNow();
+			if (!executor.awaitTermination(1, TimeUnit.SECONDS))
+			{
+				logger.info("Exiting because of timeout... {}", executor);
+				System.exit(0);
+			}
+			logger.info("Exiting normally");
+		}
 	}
 }
