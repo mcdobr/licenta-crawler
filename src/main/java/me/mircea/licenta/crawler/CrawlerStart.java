@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
-import com.google.type.Money;
 import com.googlecode.objectify.ObjectifyFactory;
 import com.googlecode.objectify.ObjectifyService;
 import com.googlecode.objectify.impl.translate.opt.BigDecimalLongTranslatorFactory;
@@ -63,14 +62,14 @@ public final class CrawlerStart {
 			}
 		}
 		
-		if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+		if (!executor.awaitTermination(2, TimeUnit.HOURS)) {
 			executor.shutdownNow();
 			if (!executor.awaitTermination(1, TimeUnit.SECONDS))
 			{
-				logger.info("Exiting because of timeout... {}", executor);
+				logger.info("Exiting because of timeout: {}", executor);
 				System.exit(0);
 			}
-			logger.info("Exiting normally");
+			logger.info("Exiting normally: {}", executor);
 		}
 	}
 }
