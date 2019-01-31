@@ -45,7 +45,8 @@ public final class CrawlerStart {
 		ObjectifyService.register(WebWrapper.class);
 
 		List<String> seedList = Arrays.asList(
-				"https://carturesti.ro/raft/carte-109?per-page=90",
+				"https://carturesti.ro/raft/carte-109?per-page=90&page=40",
+				//"https://carturesti.ro/raft/carte-straina-1937?stock_label=stoc-limitat,livrare-24,in-stoc&per-page=90",
 				"http://www.librariilealexandria.ro/carte",
 				"https://www.libris.ro/carti"
 				);
@@ -56,7 +57,7 @@ public final class CrawlerStart {
 			} catch (MalformedURLException e) {
 				logger.debug("Problem regarding gathering pages: {}.", e.getMessage());
 			} catch (FileNotFoundException | NullPointerException e) {
-				logger.error("Configuration file not found. Exception details: {}", e);
+				logger.error("Properties file not found. Exception details: {}", e);
 			} catch (IOException e) {
 				logger.warn("Could not read from an input stream. Exception details: {}", e);
 			}

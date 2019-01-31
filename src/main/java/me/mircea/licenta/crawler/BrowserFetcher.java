@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.jsoup.Jsoup;
@@ -28,6 +27,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import crawlercommons.robots.BaseRobotRules;
 import me.mircea.licenta.core.utils.CssUtil;
 import me.mircea.licenta.core.utils.HtmlUtil;
 import me.mircea.licenta.miner.Miner;
@@ -41,52 +41,86 @@ import me.mircea.licenta.miner.Miner;
  *        not make parallel requests and make queries with a small time gap.
  */
 
-// TODO: maybe inherit autoclosable
-public class BrowserFetcher implements Runnable {
-	private static final String CONFIG_FILENAME = "fetcher.properties";
+public class BrowserFetcher implements Fetcher {
+	private static final String PROPERTIES_FILENAME = "fetcher_default.properties";
+	private static final Map<String, Cookie> DOMAIN_COOKIES = new HashMap<>();
 	private static final Logger logger = LoggerFactory.getLogger(BrowserFetcher.class);
-	private static final Map<String, Cookie> domainCookies = new HashMap<>();
 	
 	static {
 		Cookie librisModalCookie = new Cookie.Builder("GCLIDSEEN", "whatever")
 				.domain("libris.ro")
 				.build();
 		
-		domainCookies.put(librisModalCookie.getDomain(), librisModalCookie);
+		DOMAIN_COOKIES.put(librisModalCookie.getDomain(), librisModalCookie);
 	}
 	
 	private final String startUrl;
 	private final String domain;
 	private final WebDriver driver;
-	private final int crawlDelay;
+	private Map<String, String> properties;
+	private BaseRobotRules crawlRules;
 	
 	public BrowserFetcher(String startUrl) throws IOException {
 		this.startUrl = startUrl;
 		this.domain = HtmlUtil.getDomainOfUrl(startUrl);
 
-		InputStream configInputStream = getClass().getResourceAsStream("/" + CONFIG_FILENAME);
-		Properties properties = new Properties();
-		properties.load(configInputStream);
-
-		System.setProperty("webdriver.gecko.driver", properties.getProperty("webdriver_path"));
-		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
-				properties.getProperty("browser_log_file", "browser.log"));
-
-		this.crawlDelay = Integer.parseInt(properties.getProperty("crawlDelay"));
-
+		InputStream propertiesInputStream = getClass().getResourceAsStream("/" + PROPERTIES_FILENAME);
+		this.properties = readPropertiesFile(propertiesInputStream);
+		this.crawlRules = readRobotsFile(this.startUrl, this.properties);
+		
+		System.setProperty("webdriver.gecko.driver", this.properties.get("browser_webdriver_path"));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, this.properties.get("browser_log_file"));
+		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference("permissions.default.image", 2); // Don't load images
-		profile.setPreference("dom.popup_maximum", 0);
-		profile.setPreference("privacy.popups.showBrowserMessage", false);
+		profile.setPreference("permissions.default.image", Integer.valueOf(this.properties.get("browser_load_images")));
+		profile.setPreference("dom.popup_maximum", Integer.valueOf(this.properties.get("browser_popup_maximum")));
+		profile.setPreference("privacy.popups.showBrowserMessage", Boolean.valueOf(this.properties.get("browser_popup_show_browser_message")));
+		
 		FirefoxOptions opts = new FirefoxOptions();
 		// opts.setHeadless(true);
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
-		this.driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-		
+		this.driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);	
 	}
-
+	
+	@Override
+	public void run() {
+		this.traverseMultiProductPages(startUrl);
+	}
+	
+	/**
+	 * @param startMultiProductPage
+	 *            First page that contains multiple products.
+	 * @throws InterruptedException
+	 * @throws MalformedURLException 
+	 */
+	private void traverseMultiProductPages(final String startMultiProductPage) {
+		String url = startMultiProductPage;
+		driver.get(url);
+		
+		Cookie cookie = DOMAIN_COOKIES.get(this.domain);
+		if(cookie != null)
+			driver.manage().addCookie(cookie);
+		
+		boolean havePagesLeft = true;
+		while (havePagesLeft) {
+			Document multiProductPage = getDocumentStripped(driver.getPageSource());
+			Instant retrievedTime = Instant.now();
+			logger.info("Got document {}", driver.getCurrentUrl());
+			
+			try {
+				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage));
+				CrawlerStart.executor.submit(miner);
+			} catch (MalformedURLException e) {
+				logger.debug("Could not start extracting because of corrupt urls {}", e);
+			}
+			
+			havePagesLeft = visitNextPage();
+		}
+		driver.quit();
+	}
+	
 	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
 		Map<String, Document> singleProductPages = new HashMap<>();
 		Elements singleBookElements = multiProductPage.select(CssUtil.makeLeafOfSelector("[class*='produ']:has(img):has(a)"));
@@ -113,45 +147,9 @@ public class BrowserFetcher implements Runnable {
 				singleProductPages.put(url, bookPage);
 			} else {
 				logger.warn("Could not get page {} after {} tries", url, MAX_TRIES);
-			}
-			
+			}	
 		}
-
 		return singleProductPages;
-	}
-
-	/**
-	 * @param startMultiProductPage
-	 *            First page that contains multiple products.
-	 * @throws InterruptedException
-	 * @throws MalformedURLException 
-	 */
-	public void traverseMultiProductPages(final String startMultiProductPage) {
-		String url = startMultiProductPage;
-		driver.get(url);
-		
-		Cookie cookie = domainCookies.get(this.domain);
-		if(cookie != null)
-			driver.manage().addCookie(cookie);
-		
-		boolean havePagesLeft = true;
-		while (havePagesLeft) {
-			Document multiProductPage = getDocumentStripped(driver.getPageSource());
-			Instant retrievedTime = Instant.now();
-			logger.info("Got document {}", driver.getCurrentUrl());
-			
-			try {
-				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage));
-				CrawlerStart.executor.submit(miner);
-			} catch (MalformedURLException e) {
-				logger.debug("Could not start extracting because of corrupt urls {}", e);
-			}
-			
-			
-			havePagesLeft = visitNextPage();
-		}
-		//
-		driver.quit();
 	}
 	
 	private boolean visitNextPage() {
@@ -164,17 +162,10 @@ public class BrowserFetcher implements Runnable {
 			WebDriverWait clickWait = new WebDriverWait(driver, 20);
 			clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
 
-			
 			nextPageLink.click();
 			return true;
 		} else
 			return false;
-	}
-
-	@Override
-	public void run() {
-		this.traverseMultiProductPages(startUrl);
-		driver.quit();
 	}
 
 	private Document getDocumentStripped(String pageSource) {

@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.ObjectifyService;
-import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.LoadType;
 
 import me.mircea.licenta.core.entities.PricePoint;
@@ -48,12 +47,7 @@ public class Miner implements Runnable {
 		this.retrievedTime = retrievedTime;
 		this.singleBookPages = singleBookPages;
 		this.site = HtmlUtil.getDomainOfUrl(multiBookPage.baseUri());
-		this.wrapper = ObjectifyService.run(new Work<WebWrapper>() {
-			@Override
-			public WebWrapper run() {
-				return getWrapperForSite(site);
-			}
-		});
+		this.wrapper = ObjectifyService.run(() -> getWrapperForSite(site));
 	}
 
 	public Elements getBookElements() {
@@ -64,28 +58,20 @@ public class Miner implements Runnable {
 	@Override
 	public void run() {
 		HtmlUtil.sanitizeHtml(multiBookPage);
-		
-		ObjectifyService.run(new Work<Void>() {
-			@Override
-			public Void run() {
-
+		ObjectifyService.run(() -> {
 				InformationExtractionStrategy extractionStrategy = chooseStrategy();
 				persistBooks(extractionStrategy);
 				return null;
 			}
-		});
+		);
 	}
 
+	/**
+	 * @return Appropriate strategy for current context
+	 */
 	private InformationExtractionStrategy chooseStrategy() {
 		WebWrapper wrapper = getWrapperForSite(this.site);
 		return new HeuristicalStrategy();
-		
-		/*
-		if (wrapper == null) {
-			return new HeuristicalStrategy();
-		} else {
-			return new WrapperStrategy(wrapper);
-		}*/
 	}
 
 	private void persistBooks(InformationExtractionStrategy strategy) {
@@ -108,7 +94,6 @@ public class Miner implements Runnable {
 			if (books.isEmpty()) {
 				++inserted;
 				ObjectifyService.ofy().save().entity(book);
-				//session.save(book);
 				logger.info("Saving new {} to db.", book);
 			} else {
 				++updated;
@@ -120,13 +105,11 @@ public class Miner implements Runnable {
 					Book bookToPersist = mergedBook.get();
 					ObjectifyService.ofy().delete().entities(persistedBook);
 					ObjectifyService.ofy().save().entities(bookToPersist);
-					//session.merge(mergedBook.get());
 					logger.info("Updating book to {} in db.", mergedBook.get());
 				}
 			}
 		}
-		// TODO: setup loggers right
-		logger.error("Found {}/{} books on {} : {} inserted, {} updated.", bookElements.size(), singleBookPages.size(),
+		logger.info("Found {}/{} books on {} : {} inserted, {} updated.", bookElements.size(), singleBookPages.size(),
 				multiBookPage.absUrl("href"), inserted, updated);
 	}
 
@@ -134,7 +117,7 @@ public class Miner implements Runnable {
 		Element anySingleBookPage = singleBookPages.values().iterator().next();
 		WebWrapper wrapper = wrapperGenerator.generateWrapper(anySingleBookPage, new Elements(multiBookPage));
 		
-		logger.error("Adding wrapper {}", wrapper);
+		logger.info("Adding wrapper {}", wrapper);
 		return ObjectifyService.ofy().save().entity(wrapper).now();
 	}
 
