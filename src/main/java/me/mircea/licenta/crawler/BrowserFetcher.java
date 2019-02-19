@@ -1,10 +1,7 @@
 package me.mircea.licenta.crawler;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.SocketTimeoutException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +24,10 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import crawlercommons.robots.BaseRobotRules;
-import me.mircea.licenta.core.utils.CssUtil;
-import me.mircea.licenta.core.utils.HtmlUtil;
-import me.mircea.licenta.miner.Miner;
+import me.mircea.licenta.core.crawl.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.CrawlRequest;
+import me.mircea.licenta.core.parser.utils.CssUtil;
+import me.mircea.licenta.core.parser.utils.HtmlUtil;
 
 /**
  * @author mircea
@@ -42,7 +39,6 @@ import me.mircea.licenta.miner.Miner;
  */
 
 public class BrowserFetcher implements Fetcher {
-	private static final String PROPERTIES_FILENAME = "fetcher_default.properties";
 	private static final Map<String, Cookie> DOMAIN_COOKIES = new HashMap<>();
 	private static final Logger logger = LoggerFactory.getLogger(BrowserFetcher.class);
 	
@@ -54,27 +50,21 @@ public class BrowserFetcher implements Fetcher {
 		DOMAIN_COOKIES.put(librisModalCookie.getDomain(), librisModalCookie);
 	}
 	
-	private final String startUrl;
-	private final String domain;
 	private final WebDriver driver;
-	private Map<String, String> properties;
-	private BaseRobotRules crawlRules;
+	private final CrawlRequest request;
 	
-	public BrowserFetcher(String startUrl) throws IOException {
-		this.startUrl = startUrl;
-		this.domain = HtmlUtil.getDomainOfUrl(startUrl);
-
-		InputStream propertiesInputStream = getClass().getResourceAsStream("/" + PROPERTIES_FILENAME);
-		this.properties = readPropertiesFile(propertiesInputStream);
-		this.crawlRules = readRobotsFile(this.startUrl, this.properties);
+	public BrowserFetcher(CrawlRequest request) {
+		this.request = request;
 		
-		System.setProperty("webdriver.gecko.driver", this.properties.get("browser_webdriver_path"));
-		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, this.properties.get("browser_log_file"));
+		Map<String, String> properties = this.request.getProperties();		
+		System.setProperty("webdriver.gecko.driver", properties.get("browser_webdriver_path"));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, properties.get("browser_log_file"));
 		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference("permissions.default.image", Integer.valueOf(this.properties.get("browser_load_images")));
-		profile.setPreference("dom.popup_maximum", Integer.valueOf(this.properties.get("browser_popup_maximum")));
-		profile.setPreference("privacy.popups.showBrowserMessage", Boolean.valueOf(this.properties.get("browser_popup_show_browser_message")));
+		profile.setPreference("permissions.default.image", Integer.valueOf(properties.get("browser_load_images")));
+		profile.setPreference("dom.popup_maximum", Integer.valueOf(properties.get("browser_popup_maximum")));
+		profile.setPreference("privacy.popups.showBrowserMessage", Boolean.valueOf(properties.get("browser_popup_show_browser_message")));
+		//profile.setPreference("general.useragent.override", properties.get("user_agent"));
 		
 		FirefoxOptions opts = new FirefoxOptions();
 		// opts.setHeadless(true);
@@ -86,68 +76,70 @@ public class BrowserFetcher implements Fetcher {
 	
 	@Override
 	public void run() {
-		this.traverseMultiProductPages(startUrl);
+		this.traverseMultiProductPages(this.request.getStartUrl());
 	}
 	
-	/**
-	 * @param startMultiProductPage
-	 *            First page that contains multiple products.
-	 * @throws InterruptedException
-	 * @throws MalformedURLException 
-	 */
-	private void traverseMultiProductPages(final String startMultiProductPage) {
-		String url = startMultiProductPage;
-		driver.get(url);
+	private void traverseMultiProductPages(final String firstMultiProductPage) {
+		driver.get(firstMultiProductPage);
 		
-		Cookie cookie = DOMAIN_COOKIES.get(this.domain);
+		Cookie cookie = DOMAIN_COOKIES.get(this.request.getDomain());
 		if(cookie != null)
 			driver.manage().addCookie(cookie);
 		
 		boolean havePagesLeft = true;
+		String previousMultiProductUrl = "";
 		while (havePagesLeft) {
 			Document multiProductPage = getDocumentStripped(driver.getPageSource());
 			Instant retrievedTime = Instant.now();
-			logger.info("Got document {}", driver.getCurrentUrl());
+			String multiProductUrl = driver.getCurrentUrl();
+		
+			// TODO: move database logic to CrawlDatabaseManager
+			Map<String, org.bson.Document> urlUpdates = new HashMap<>();
+			org.bson.Document shelfUpdateDoc = new org.bson.Document("$set", new org.bson.Document("url", multiProductUrl))
+					.append("$set", new org.bson.Document("referer", previousMultiProductUrl))
+					.append("$min", new org.bson.Document("discoveredTime", retrievedTime))
+					.append("$set", new org.bson.Document("type", "shelf"));
+			urlUpdates.put(multiProductUrl, shelfUpdateDoc);
+		
+			List<String> singleProductUrls = getSingleProductPages(multiProductPage);
 			
+			singleProductUrls.forEach(singleUrl -> {
+				org.bson.Document productUpdateDoc = new org.bson.Document("$set", new org.bson.Document("url", singleUrl))
+						.append("$set", new org.bson.Document("referer", multiProductUrl))
+						.append("$min", new org.bson.Document("discoveredTime", retrievedTime))
+						.append("$set", new org.bson.Document("type", "product"));
+				
+				urlUpdates.put(singleUrl, productUpdateDoc);
+			});
+			
+			
+			CrawlDatabaseManager.instance.upsertManyUrls(urlUpdates);
+			logger.info("Got document {} at {}", multiProductUrl, retrievedTime);
+			
+			
+			/* try to start miner (scrapper)
+			/*
 			try {
-				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage));
-				CrawlerStart.executor.submit(miner);
+				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage), crawlRules);
+				CrawlerMain.executor.submit(miner);
 			} catch (MalformedURLException e) {
 				logger.debug("Could not start extracting because of corrupt urls {}", e);
-			}
+			}*/
 			
 			havePagesLeft = visitNextPage();
 		}
 		driver.quit();
 	}
 	
-	public Map<String, Document> getSingleProductPages(Document multiProductPage) {
-		Map<String, Document> singleProductPages = new HashMap<>();
+	public List<String> getSingleProductPages(Document multiProductPage) {
+		List<String> singleProductPages = new ArrayList<>();
 		Elements singleBookElements = multiProductPage.select(CssUtil.makeLeafOfSelector("[class*='produ']:has(img):has(a)"));
 		Elements links = new Elements();
 		singleBookElements.stream().forEach(bookElement -> links.add(bookElement.selectFirst("a[href]")));
 		
 		for (Element link : links) {
 			String url = link.absUrl("href");
-			
-			final int MAX_TRIES = 1;
-			Document bookPage = null;
-			for (int i = 0; i < MAX_TRIES; ++i) {
-				try {
-					bookPage = HtmlUtil.sanitizeHtml(Jsoup.connect(url).get());
-					break;
-				} catch (SocketTimeoutException e) {
-					logger.warn("Socket timed out on {}", url);
-				} catch (IOException e) {
-					logger.warn("Could not get page {}", url);
-				}
-			}
-			
-			if (bookPage != null) {
-				singleProductPages.put(url, bookPage);
-			} else {
-				logger.warn("Could not get page {} after {} tries", url, MAX_TRIES);
-			}	
+			singleProductPages.add(url);
 		}
 		return singleProductPages;
 	}
@@ -157,11 +149,30 @@ public class BrowserFetcher implements Fetcher {
 				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
 		
 		if (!followingPaginationLink.isEmpty()) {
+			
+			try {
+				//TODO: this is hardcoded
+				TimeUnit.MILLISECONDS.sleep(1000);
+			} catch (InterruptedException e) {
+				logger.warn("Thread interrupted with {}", e);
+				Thread.currentThread().interrupt();
+			}
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			
-			WebDriverWait clickWait = new WebDriverWait(driver, 20);
-			clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
-
+			final int MAX_WAIT_IN_SECONDS = 30;
+			
+			
+			
+			WebDriverWait pageLoadWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
+			//nextPageLink = pageLoadWait.until(isTrue)
+			
+			WebDriverWait clickWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
+			nextPageLink = clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
+			WebDriverWait visibleWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
+			nextPageLink = visibleWait.until(ExpectedConditions.visibilityOf(nextPageLink));
+			//nextPageLink = clickWait.until(isTrue)
+			
+			
 			nextPageLink.click();
 			return true;
 		} else
@@ -169,7 +180,7 @@ public class BrowserFetcher implements Fetcher {
 	}
 
 	private Document getDocumentStripped(String pageSource) {
-		Document doc = Jsoup.parse(pageSource, startUrl);
+		Document doc = Jsoup.parse(pageSource, this.request.getStartUrl());
 		return HtmlUtil.sanitizeHtml(doc);
 	}
 }

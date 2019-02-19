@@ -40,11 +40,6 @@
 			<artifactId>jsoup</artifactId>
 			<version>1.11.3</version>
 		</dependency>
-		<dependency>
-		  <groupId>com.github.crawler-commons</groupId>
-		  <artifactId>crawler-commons</artifactId>
-		  <version>0.10</version>
-		</dependency>
 	</dependencies>
 
 	<build>
