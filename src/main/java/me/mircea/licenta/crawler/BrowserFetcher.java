@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -24,8 +25,9 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import me.mircea.licenta.core.crawl.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.CrawlRequest;
+import me.mircea.licenta.core.crawl.db.model.Page;
+import me.mircea.licenta.core.crawl.db.model.PageType;
 import me.mircea.licenta.core.parser.utils.CssUtil;
 import me.mircea.licenta.core.parser.utils.HtmlUtil;
 
@@ -87,38 +89,25 @@ public class BrowserFetcher implements Fetcher {
 			driver.manage().addCookie(cookie);
 		
 		boolean havePagesLeft = true;
-		String previousMultiProductUrl = "";
+		String previousShelfUrl = null;
 		while (havePagesLeft) {
-			Document multiProductPage = getDocumentStripped(driver.getPageSource());
+			Document shelfDoc = getDocumentStripped(driver.getPageSource());
+			String shelfUrl = driver.getCurrentUrl();
 			Instant retrievedTime = Instant.now();
-			String multiProductUrl = driver.getCurrentUrl();
-		
-			// TODO: move database logic to CrawlDatabaseManager
-			Map<String, org.bson.Document> urlUpdates = new HashMap<>();
-			org.bson.Document shelfUpdateDoc = new org.bson.Document("$set", new org.bson.Document("url", multiProductUrl))
-					.append("$set", new org.bson.Document("referer", previousMultiProductUrl))
-					.append("$min", new org.bson.Document("discoveredTime", retrievedTime))
-					.append("$set", new org.bson.Document("type", "shelf"));
-			urlUpdates.put(multiProductUrl, shelfUpdateDoc);
-		
-			List<String> singleProductUrls = getSingleProductPages(multiProductPage);
 			
-			singleProductUrls.forEach(singleUrl -> {
-				org.bson.Document productUpdateDoc = new org.bson.Document("$set", new org.bson.Document("url", singleUrl))
-						.append("$set", new org.bson.Document("referer", multiProductUrl))
-						.append("$min", new org.bson.Document("discoveredTime", retrievedTime))
-						.append("$set", new org.bson.Document("type", "product"));
-				
-				urlUpdates.put(singleUrl, productUpdateDoc);
-			});
+			Page shelfPage = new Page(shelfUrl, retrievedTime, previousShelfUrl, PageType.SHELF);
+			List<String> productUrls = getSingleProductPages(shelfDoc);
+			List<Page> batchOfPages = productUrls.stream()
+					.map(productUrl -> new Page(productUrl, retrievedTime, shelfUrl, PageType.PRODUCT))
+					.collect(Collectors.toList());
+			batchOfPages.add(shelfPage);
+			//CrawlDatabaseManager.instance.upsertManyPages(batchOfPages);
 			
-			
-			CrawlDatabaseManager.instance.upsertManyUrls(urlUpdates);
-			logger.info("Got document {} at {}", multiProductUrl, retrievedTime);
+			previousShelfUrl = shelfUrl;
+			logger.info("Got document {} at {}", shelfUrl, retrievedTime);
 			
 			
 			/* try to start miner (scrapper)
-			/*
 			try {
 				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage), crawlRules);
 				CrawlerMain.executor.submit(miner);

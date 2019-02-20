@@ -1,0 +1,1 @@
+[![Build Status](https://travis-ci.com/mcdobr/licenta-fetcher.svg?branch=master)](https://travis-ci.com/mcdobr/licenta-fetcher)
