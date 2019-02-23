@@ -25,6 +25,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import me.mircea.licenta.core.crawl.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.CrawlRequest;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
@@ -66,7 +67,7 @@ public class BrowserFetcher implements Fetcher {
 		profile.setPreference("permissions.default.image", Integer.valueOf(properties.get("browser_load_images")));
 		profile.setPreference("dom.popup_maximum", Integer.valueOf(properties.get("browser_popup_maximum")));
 		profile.setPreference("privacy.popups.showBrowserMessage", Boolean.valueOf(properties.get("browser_popup_show_browser_message")));
-		//profile.setPreference("general.useragent.override", properties.get("user_agent"));
+		profile.setPreference("general.useragent.override", properties.get("user_agent"));
 		
 		FirefoxOptions opts = new FirefoxOptions();
 		// opts.setHeadless(true);
@@ -101,20 +102,10 @@ public class BrowserFetcher implements Fetcher {
 					.map(productUrl -> new Page(productUrl, retrievedTime, shelfUrl, PageType.PRODUCT))
 					.collect(Collectors.toList());
 			batchOfPages.add(shelfPage);
-			//CrawlDatabaseManager.instance.upsertManyPages(batchOfPages);
+			CrawlDatabaseManager.instance.upsertManyPages(batchOfPages);
 			
 			previousShelfUrl = shelfUrl;
 			logger.info("Got document {} at {}", shelfUrl, retrievedTime);
-			
-			
-			/* try to start miner (scrapper)
-			try {
-				Miner miner = new Miner(multiProductPage, retrievedTime, getSingleProductPages(multiProductPage), crawlRules);
-				CrawlerMain.executor.submit(miner);
-			} catch (MalformedURLException e) {
-				logger.debug("Could not start extracting because of corrupt urls {}", e);
-			}*/
-			
 			havePagesLeft = visitNextPage();
 		}
 		driver.quit();
