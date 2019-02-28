@@ -2,9 +2,6 @@ package me.mircea.licenta.crawler;
 
 import java.io.IOException;
 
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLSocketFactory;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

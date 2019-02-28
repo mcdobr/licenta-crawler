@@ -131,17 +131,14 @@ public class BrowserFetcher implements Fetcher {
 		if (!followingPaginationLink.isEmpty()) {
 			
 			try {
-				//TODO: this is hardcoded
-				TimeUnit.MILLISECONDS.sleep(1000);
+				TimeUnit.MILLISECONDS.sleep(this.request.getRobotRules().getCrawlDelay());
 			} catch (InterruptedException e) {
 				logger.warn("Thread interrupted with {}", e);
 				Thread.currentThread().interrupt();
 			}
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			
-			final int MAX_WAIT_IN_SECONDS = 30;
-			
-			
+			final int MAX_WAIT_IN_SECONDS = 300;
 			
 			WebDriverWait pageLoadWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
 			//nextPageLink = pageLoadWait.until(isTrue)
@@ -150,8 +147,6 @@ public class BrowserFetcher implements Fetcher {
 			nextPageLink = clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
 			WebDriverWait visibleWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
 			nextPageLink = visibleWait.until(ExpectedConditions.visibilityOf(nextPageLink));
-			//nextPageLink = clickWait.until(isTrue)
-			
 			
 			nextPageLink.click();
 			return true;
