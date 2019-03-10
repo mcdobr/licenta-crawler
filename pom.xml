@@ -7,10 +7,11 @@
 
 	<groupId>me.mircea.licenta</groupId>
 	<artifactId>crawler</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
+	<packaging>war</packaging>
 
 	<name>crawler</name>
-	<!-- FIXME change it to the project's website -->
+	<url>https://bookworm-221210.appspot.com/about</url>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -47,16 +48,10 @@
 			<version>4.0.1</version>
 			<scope>provided</scope>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.glassfish.jersey.bundles/jaxrs-ri -->
-		<dependency>
-			<groupId>org.glassfish.jersey.bundles</groupId>
-			<artifactId>jaxrs-ri</artifactId>
-			<version>2.28</version>
-		</dependency>
-
 	</dependencies>
 
 	<build>
+		<finalName>${project.artifactId}</finalName>
 		<pluginManagement><!-- lock down plugins versions to avoid using Maven 
 				defaults (may be moved to parent pom) -->
 			<plugins>
