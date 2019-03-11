@@ -14,13 +14,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import me.mircea.licenta.core.crawl.db.model.Job;
+import me.mircea.licenta.core.crawl.db.model.JobType;
+import me.mircea.licenta.crawler.BrowserCrawler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import me.mircea.licenta.core.crawl.CrawlRequest;
-import me.mircea.licenta.crawler.BrowserFetcher;
-import me.mircea.licenta.crawler.Fetcher;
-import me.mircea.licenta.crawler.SitemapSaxFetcher;
+import me.mircea.licenta.crawler.Crawler;
+import me.mircea.licenta.crawler.SitemapSaxCrawler;
 
 @Path("/jobs")
 public class JobResource {
@@ -44,19 +45,19 @@ public class JobResource {
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response createCrawlerJob(String seed) {
-		CrawlRequest request;
+		Job job;
 		try {
-			request = new CrawlRequest(seed);
-			Fetcher fetcher;
-			if (!request.getRobotRules().getSitemaps().isEmpty()) {
-				fetcher = new SitemapSaxFetcher(request);
+			job = new Job(seed, JobType.CRAWL);
+			Crawler crawler;
+			if (!job.getRobotRules().getSitemaps().isEmpty()) {
+				crawler = new SitemapSaxCrawler(job);
 			} else {
-				fetcher = new BrowserFetcher(request);
+				crawler = new BrowserCrawler(job);
 			}
-			ASYNC_TASK_EXECUTOR.submit(fetcher);
+			ASYNC_TASK_EXECUTOR.submit(crawler);
 
 			return Response.status(202)
-					.entity(request)
+					.entity(job)
 					.build();
 		} catch (IOException e) {
 			LOGGER.warn("Could not read a file {}", e);
