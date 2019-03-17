@@ -1,6 +1,7 @@
 package me.mircea.licenta.crawler.webservices;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -14,9 +15,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.JobType;
 import me.mircea.licenta.crawler.BrowserCrawler;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,15 +33,21 @@ public class JobResource {
 	
 	@GET
 	@Produces(MediaType.TEXT_PLAIN)
-	public List<String> listActiveCrawlerJobs() {
-		throw new UnsupportedOperationException();
+	public List<Job> listActiveCrawlerJobs() {
+		//TODO: choose apache or guava to do this
+		Iterable<Job> iterable = CrawlDatabaseManager.instance.getActiveJobsByType(JobType.CRAWL);
+
+		List<Job> jobList = new ArrayList<>();
+		iterable.forEach(jobList::add);
+
+		return jobList;
 	}
 
 	@GET
 	@Path("{jobId}")
 	@Produces(MediaType.TEXT_PLAIN)
-	public String getCrawlerJobStatus(@PathParam("jobId") int jobId) {
-		throw new UnsupportedOperationException();
+	public Job getCrawlerJobStatus(@PathParam("jobId") ObjectId jobId) {
+		return CrawlDatabaseManager.instance.getJobById(jobId);
 	}
 
 	@POST
@@ -54,6 +63,7 @@ public class JobResource {
 			} else {
 				crawler = new BrowserCrawler(job);
 			}
+
 			ASYNC_TASK_EXECUTOR.submit(crawler);
 
 			return Response.status(202)

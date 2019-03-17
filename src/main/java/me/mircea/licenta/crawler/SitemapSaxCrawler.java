@@ -25,7 +25,7 @@ import crawlercommons.sitemaps.SiteMapIndex;
 import crawlercommons.sitemaps.SiteMapParser;
 import crawlercommons.sitemaps.SiteMapURL;
 import crawlercommons.sitemaps.UnknownFormatException;
-import me.mircea.licenta.core.crawl.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.model.Page;
 
 public class SitemapSaxCrawler implements Crawler {

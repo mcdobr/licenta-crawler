@@ -26,7 +26,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import me.mircea.licenta.core.crawl.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
 import me.mircea.licenta.core.parser.utils.CssUtil;
