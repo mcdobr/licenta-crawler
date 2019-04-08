@@ -1,16 +1,16 @@
 package me.mircea.licenta.crawler;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.List;
-
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.JobType;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.List;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class BrowserCrawlerTest {
 	@Test
@@ -33,7 +33,6 @@ public class BrowserCrawlerTest {
 		Document doc = Jsoup.connect("https://www.libris.ro/carti").get();
 		
 		assertNotNull(doc.selectFirst(".NewsClose"));
-		
 	}
 	
 }

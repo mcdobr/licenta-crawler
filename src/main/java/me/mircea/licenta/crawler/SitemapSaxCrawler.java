@@ -1,32 +1,22 @@
 package me.mircea.licenta.crawler;
 
+import crawlercommons.sitemaps.*;
+import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.db.model.Job;
+import me.mircea.licenta.core.crawl.db.model.Page;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Queue;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
-
-import me.mircea.licenta.core.crawl.db.model.Job;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import crawlercommons.sitemaps.AbstractSiteMap;
-import crawlercommons.sitemaps.SiteMap;
-import crawlercommons.sitemaps.SiteMapIndex;
-import crawlercommons.sitemaps.SiteMapParser;
-import crawlercommons.sitemaps.SiteMapURL;
-import crawlercommons.sitemaps.UnknownFormatException;
-import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
-import me.mircea.licenta.core.crawl.db.model.Page;
 
 public class SitemapSaxCrawler implements Crawler {
 	private static final Logger logger = LoggerFactory.getLogger(SitemapSaxCrawler.class);
@@ -42,7 +32,6 @@ public class SitemapSaxCrawler implements Crawler {
 		try {
 			List<SiteMapURL> sitemapLinks = getLinksToBeCrawled();
 			Instant retrievedTime = Instant.now();
-			
 			List<Page> pages = sitemapLinks.stream()
 					.map(link -> new Page(link.getUrl().toString(), retrievedTime, "sitemap"))
 					.collect(Collectors.toList());
@@ -55,7 +44,7 @@ public class SitemapSaxCrawler implements Crawler {
 		}
 	}
 	
-	private List<SiteMapURL> getLinksToBeCrawled() throws IOException, UnknownFormatException {
+	public List<SiteMapURL> getLinksToBeCrawled() throws IOException, UnknownFormatException {
 		List<SiteMapURL> linksToBeCrawled = new ArrayList<>();
 		
 		Queue<String> siteMapQueue = new LinkedList<>();

@@ -1,23 +1,17 @@
 package me.mircea.licenta.crawler;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
+import com.google.common.base.Preconditions;
+import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.model.Job;
+import me.mircea.licenta.core.crawl.db.model.Page;
+import me.mircea.licenta.core.crawl.db.model.PageType;
+import me.mircea.licenta.core.parser.utils.CssUtil;
+import me.mircea.licenta.core.parser.utils.HtmlUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.openqa.selenium.By;
-import org.openqa.selenium.Cookie;
-import org.openqa.selenium.UnexpectedAlertBehaviour;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
@@ -26,11 +20,13 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
-import me.mircea.licenta.core.crawl.db.model.Page;
-import me.mircea.licenta.core.crawl.db.model.PageType;
-import me.mircea.licenta.core.parser.utils.CssUtil;
-import me.mircea.licenta.core.parser.utils.HtmlUtil;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * @author mircea
@@ -69,7 +65,7 @@ public class BrowserCrawler implements Crawler {
 		profile.setPreference("general.useragent.override", Job.getDefault("user_agent"));
 		
 		FirefoxOptions opts = new FirefoxOptions();
-		// opts.setHeadless(true);
+		opts.setHeadless(true);
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
@@ -122,13 +118,18 @@ public class BrowserCrawler implements Crawler {
 		}
 		return singleProductPages;
 	}
+
+	private Document getDocumentStripped(String url) {
+		Preconditions.checkNotNull(url);
+		Document doc = Jsoup.parse(url, this.job.getSeed());
+		return HtmlUtil.sanitizeHtml(doc);
+	}
 	
 	private boolean visitNextPage() {
 		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
 				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
 		
 		if (!followingPaginationLink.isEmpty()) {
-			
 			try {
 				TimeUnit.MILLISECONDS.sleep(this.job.getRobotRules().getCrawlDelay());
 			} catch (InterruptedException e) {
@@ -138,10 +139,6 @@ public class BrowserCrawler implements Crawler {
 			WebElement nextPageLink = followingPaginationLink.get(0);
 			
 			final int MAX_WAIT_IN_SECONDS = 300;
-			
-			WebDriverWait pageLoadWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
-			//nextPageLink = pageLoadWait.until(isTrue)
-			
 			WebDriverWait clickWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
 			nextPageLink = clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
 			WebDriverWait visibleWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
@@ -151,10 +148,5 @@ public class BrowserCrawler implements Crawler {
 			return true;
 		} else
 			return false;
-	}
-
-	private Document getDocumentStripped(String pageSource) {
-		Document doc = Jsoup.parse(pageSource, this.job.getSeed());
-		return HtmlUtil.sanitizeHtml(doc);
 	}
 }
