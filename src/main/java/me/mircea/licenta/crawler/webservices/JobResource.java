@@ -32,7 +32,7 @@ public class JobResource {
 	private static final Logger LOGGER = LoggerFactory.getLogger(JobResource.class);
 	
 	@GET
-	@Produces(MediaType.TEXT_PLAIN)
+	@Produces(MediaType.APPLICATION_JSON)
 	public List<Job> listActiveCrawlerJobs() {
 		//TODO: choose apache or guava to do this
 		Iterable<Job> iterable = CrawlDatabaseManager.instance.getActiveJobsByType(JobType.CRAWL);
@@ -45,7 +45,7 @@ public class JobResource {
 
 	@GET
 	@Path("{jobId}")
-	@Produces(MediaType.TEXT_PLAIN)
+	@Produces(MediaType.APPLICATION_JSON)
 	public Job getCrawlerJobStatus(@PathParam("jobId") ObjectId jobId) {
 		return CrawlDatabaseManager.instance.getJobById(jobId);
 	}
