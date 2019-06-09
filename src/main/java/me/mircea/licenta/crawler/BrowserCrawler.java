@@ -15,6 +15,8 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.htmlunit.HtmlUnitDriver;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
@@ -40,15 +42,7 @@ import java.util.stream.Collectors;
 public class BrowserCrawler implements Crawler {
 	private static final Map<String, Cookie> DOMAIN_COOKIES = new HashMap<>();
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
-	
-	static {
-		Cookie librisModalCookie = new Cookie.Builder("GCLIDSEEN", "whatever")
-				.domain("libris.ro")
-				.build();
-		
-		DOMAIN_COOKIES.put(librisModalCookie.getDomain(), librisModalCookie);
-	}
-	
+
 	private final WebDriver driver;
 	private final Job job;
 	
@@ -65,11 +59,15 @@ public class BrowserCrawler implements Crawler {
 		profile.setPreference("general.useragent.override", Job.getDefault("user_agent"));
 		
 		FirefoxOptions opts = new FirefoxOptions();
-		opts.setHeadless(true);
+		//opts.setHeadless(true);
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
-		this.driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);	
+
+		/*
+		this.driver = new HtmlUnitDriver();
+		((HtmlUnitDriver) this.driver).setJavascriptEnabled(true);*/
+		this.driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
 	}
 	
 	@Override
@@ -79,11 +77,7 @@ public class BrowserCrawler implements Crawler {
 	
 	private void traverseMultiProductPages(final String firstMultiProductPage) {
 		driver.get(firstMultiProductPage);
-		
-		Cookie cookie = DOMAIN_COOKIES.get(this.job.getDomain());
-		if(cookie != null)
-			driver.manage().addCookie(cookie);
-		
+
 		boolean havePagesLeft = true;
 		String previousShelfUrl = null;
 		while (havePagesLeft) {
@@ -91,10 +85,12 @@ public class BrowserCrawler implements Crawler {
 			String shelfUrl = driver.getCurrentUrl();
 			Instant retrievedTime = Instant.now();
 			
-			Page shelfPage = new Page(shelfUrl, retrievedTime, previousShelfUrl, PageType.SHELF);
+			Page shelfPage = new Page(shelfUrl, previousShelfUrl, PageType.SHELF, retrievedTime);
 			List<String> productUrls = getSingleProductPages(shelfDoc);
+			LOGGER.info("Got {} product urls", productUrls.size());
+
 			List<Page> batchOfPages = productUrls.stream()
-					.map(productUrl -> new Page(productUrl, retrievedTime, shelfUrl, PageType.PRODUCT))
+					.map(productUrl -> new Page(productUrl, shelfUrl, PageType.PRODUCT, retrievedTime))
 					.collect(Collectors.toList());
 			batchOfPages.add(shelfPage);
 			CrawlDatabaseManager.instance.upsertManyPages(batchOfPages);
@@ -103,6 +99,10 @@ public class BrowserCrawler implements Crawler {
 			LOGGER.info("Got document {} at {}", shelfUrl, retrievedTime);
 			havePagesLeft = visitNextPage();
 		}
+
+
+		LOGGER.info("Quitting the automated browser...");
+		driver.close();
 		driver.quit();
 	}
 	
@@ -126,27 +126,22 @@ public class BrowserCrawler implements Crawler {
 	}
 	
 	private boolean visitNextPage() {
-		List<WebElement> followingPaginationLink = driver.findElements(By.xpath(
-				"//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a"));
-		
-		if (!followingPaginationLink.isEmpty()) {
-			try {
-				TimeUnit.MILLISECONDS.sleep(this.job.getRobotRules().getCrawlDelay());
-			} catch (InterruptedException e) {
-				LOGGER.warn("Thread interrupted with {}", e);
-				Thread.currentThread().interrupt();
-			}
-			WebElement nextPageLink = followingPaginationLink.get(0);
-			
-			final int MAX_WAIT_IN_SECONDS = 300;
-			WebDriverWait clickWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
-			nextPageLink = clickWait.until(ExpectedConditions.elementToBeClickable(nextPageLink));
-			WebDriverWait visibleWait = new WebDriverWait(driver, MAX_WAIT_IN_SECONDS);
-			nextPageLink = visibleWait.until(ExpectedConditions.visibilityOf(nextPageLink));
-			
-			nextPageLink.click();
-			return true;
-		} else
-			return false;
+        final int MAX_WAIT_IN_SECONDS = 5;
+	    String nextPageLinkXpath = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
+
+	    if (!driver.findElements(By.xpath(nextPageLinkXpath)).isEmpty()) {
+            new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
+                    .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(nextPageLinkXpath)));
+            new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
+                    .until(ExpectedConditions.elementToBeClickable(By.xpath(nextPageLinkXpath)));
+
+
+            WebElement nextPageLink = driver.findElement(By.xpath(nextPageLinkXpath));
+            JavascriptExecutor executor = (JavascriptExecutor) driver;
+            executor.executeScript("arguments[0].click();", nextPageLink);
+            return true;
+        } else {
+	        return false;
+        }
 	}
 }

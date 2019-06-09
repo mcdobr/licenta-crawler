@@ -15,6 +15,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.JobType;
@@ -34,13 +37,8 @@ public class JobResource {
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<Job> listActiveCrawlerJobs() {
-		//TODO: choose apache or guava to do this
 		Iterable<Job> iterable = CrawlDatabaseManager.instance.getActiveJobsByType(JobType.CRAWL);
-
-		List<Job> jobList = new ArrayList<>();
-		iterable.forEach(jobList::add);
-
-		return jobList;
+		return Lists.newArrayList(iterable);
 	}
 
 	@GET
@@ -53,10 +51,19 @@ public class JobResource {
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response createCrawlerJob(String seed) {
+	public Response createCrawlerJob(ObjectNode crawlRequest) {
 		Job job;
 		try {
+			String seed = crawlRequest.get("seed").asText();
+
 			job = new Job(seed, JobType.CRAWL);
+			if (crawlRequest.has("additionalSitemaps")) {
+				JsonNode additionalSitemaps = crawlRequest.get("additionalSitemaps");
+				for (JsonNode node : additionalSitemaps) {
+					job.getRobotRules().addSitemap(node.asText());
+				}
+			}
+
 			Crawler crawler;
 			if (!job.getRobotRules().getSitemaps().isEmpty()) {
 				crawler = new SitemapSaxCrawler(job);
