@@ -15,8 +15,6 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
-import org.openqa.selenium.htmlunit.HtmlUnitDriver;
-import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
@@ -24,23 +22,20 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
  * @author mircea
- * @brief The thinking when designing this class was that a fetcher is a tool
- *        that grabs all html pages from a vendor's website. This 1:1
- *        relationship is mandated by "crawler politeness", as in a website is
- *        designed for humans not "robots" and such I should be respectful and
- *        not make parallel requests and make queries with a small time gap.
+ * The thinking when designing this class was that a fetcher is a tool
+ * that grabs all html pages from a vendor's website. This 1:1
+ * relationship is mandated by "crawler politeness", as in a website is
+ * designed for humans not "robots" and such I should be respectful and
+ * not make parallel requests and make queries with a small time gap.
  */
 
 public class BrowserCrawler implements Crawler {
-	private static final Map<String, Cookie> DOMAIN_COOKIES = new HashMap<>();
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
 
 	private final WebDriver driver;
@@ -59,14 +54,10 @@ public class BrowserCrawler implements Crawler {
 		profile.setPreference("general.useragent.override", Job.getDefault("user_agent"));
 		
 		FirefoxOptions opts = new FirefoxOptions();
-		//opts.setHeadless(true);
+		opts.setHeadless(Boolean.valueOf(Job.getDefault("browser_headless")));
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
-
-		/*
-		this.driver = new HtmlUnitDriver();
-		((HtmlUnitDriver) this.driver).setJavascriptEnabled(true);*/
 		this.driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
 	}
 	
@@ -110,7 +101,7 @@ public class BrowserCrawler implements Crawler {
 		List<String> singleProductPages = new ArrayList<>();
 		Elements singleBookElements = multiProductPage.select(CssUtil.makeLeafOfSelector("[class*='produ']:has(img):has(a)"));
 		Elements links = new Elements();
-		singleBookElements.stream().forEach(bookElement -> links.add(bookElement.selectFirst("a[href]")));
+		singleBookElements.forEach(bookElement -> links.add(bookElement.selectFirst("a[href]")));
 		
 		for (Element link : links) {
 			String url = link.absUrl("href");

@@ -69,7 +69,7 @@ public class SitemapSaxCrawler implements Crawler {
 					SiteMap concreteSiteMap = ((SiteMap)sitemap);
 
 					List<Page> pagesToBeUpserted = concreteSiteMap.getSiteMapUrls().stream()
-							.map(link -> new Page(link.getUrl().toString(), Instant.now(), "sitemap"))
+							.map(link -> new Page(link.getUrl().toString(), "sitemap", Instant.now()))
 							.collect(Collectors.toList());
 
 					logger.info("Discovered {} urls about to be upserted", concreteSiteMap.getSiteMapUrls().size());
