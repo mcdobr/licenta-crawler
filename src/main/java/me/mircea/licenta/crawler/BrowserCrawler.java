@@ -2,6 +2,7 @@ package me.mircea.licenta.crawler;
 
 import com.google.common.base.Preconditions;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.db.RobotDefaults;
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
@@ -22,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -38,23 +40,30 @@ import java.util.stream.Collectors;
 public class BrowserCrawler implements Crawler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
 
+	private static final String BROWSER_IMAGE_BEHAVIOUR_PREFERENCE = "permissions.default.image";
+	private static final String BROWSER_DOM_POPUPS_PREFERENCE = "dom.popup_maximum";
+	private static final String BROWSER_POPUPS_MESSAGE_PREFERENCE = "privacy.popups.showBrowserMessage";
+	private static final String BROWSER_USER_AGENT_PREFERENCE = "general.useragent.override";
+	private static final String BROWSER_COOKIE_PREFERENCE = "network.cookie.cookieBehavior";
+
 	private final WebDriver driver;
 	private final Job job;
 	
 	public BrowserCrawler(Job job) {
 		this.job = job;
 
-		System.setProperty("webdriver.gecko.driver", Job.getDefault("browser_webdriver_path"));
-		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, Job.getDefault("browser_log_file"));
+		System.setProperty("webdriver.gecko.driver", RobotDefaults.getDefault("browser_webdriver_path"));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, RobotDefaults.getDefault("browser_log_file"));
 		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference("permissions.default.image", Integer.valueOf(Job.getDefault("browser_load_images")));
-		profile.setPreference("dom.popup_maximum", Integer.valueOf(Job.getDefault("browser_popup_maximum")));
-		profile.setPreference("privacy.popups.showBrowserMessage", Boolean.valueOf(Job.getDefault("browser_popup_show_browser_message")));
-		profile.setPreference("general.useragent.override", Job.getDefault("user_agent"));
-		
+		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_load_images")));
+		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_popup_maximum")));
+		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(RobotDefaults.getDefault("browser_popup_show_browser_message")));
+		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getDefault("user_agent"));
+		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_cookie_behavior")));
+
 		FirefoxOptions opts = new FirefoxOptions();
-		opts.setHeadless(Boolean.valueOf(Job.getDefault("browser_headless")));
+		opts.setHeadless(Boolean.valueOf(RobotDefaults.getDefault("browser_headless")));
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
@@ -63,10 +72,22 @@ public class BrowserCrawler implements Crawler {
 	
 	@Override
 	public void run() {
-		this.traverseMultiProductPages(this.job.getSeed());
+		traverseMultiProductPageCollection(job.getSeeds());
 	}
-	
-	private void traverseMultiProductPages(final String firstMultiProductPage) {
+
+
+	private void traverseMultiProductPageCollection(Collection<String> seeds) {
+		for (String seed: seeds) {
+			traverseMultiProductPage(seed);
+		}
+
+		LOGGER.info("Quitting the automated browser...");
+		driver.close();
+		driver.quit();
+	}
+
+	private void traverseMultiProductPage(final String firstMultiProductPage) {
+		LOGGER.info("Following pagination links starting from {}", firstMultiProductPage);
 		driver.get(firstMultiProductPage);
 
 		boolean havePagesLeft = true;
@@ -90,11 +111,6 @@ public class BrowserCrawler implements Crawler {
 			LOGGER.info("Got document {} at {}", shelfUrl, retrievedTime);
 			havePagesLeft = visitNextPage();
 		}
-
-
-		LOGGER.info("Quitting the automated browser...");
-		driver.close();
-		driver.quit();
 	}
 	
 	public List<String> getSingleProductPages(Document multiProductPage) {
@@ -112,7 +128,9 @@ public class BrowserCrawler implements Crawler {
 
 	private Document getDocumentStripped(String url) {
 		Preconditions.checkNotNull(url);
-		Document doc = Jsoup.parse(url, this.job.getSeed());
+
+		// TODO: check this
+		Document doc = Jsoup.parse(url, this.job.getDomain());
 		return HtmlUtil.sanitizeHtml(doc);
 	}
 	

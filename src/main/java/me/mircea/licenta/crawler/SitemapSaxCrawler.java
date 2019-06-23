@@ -2,6 +2,7 @@ package me.mircea.licenta.crawler;
 
 import crawlercommons.sitemaps.*;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
+import me.mircea.licenta.core.crawl.db.RobotDefaults;
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import org.apache.commons.io.IOUtils;
@@ -95,7 +96,7 @@ public class SitemapSaxCrawler implements Crawler {
 			connection.setConnectTimeout(50 * 1000);
 			connection.setReadTimeout(50 * 1000);
 			connection.setInstanceFollowRedirects(false);
-			connection.setRequestProperty("User-Agent", Job.getDefault("user_agent"));
+			connection.setRequestProperty("User-Agent", RobotDefaults.getDefault("user_agent"));
 			connection.connect();
 
 			int httpStatus = connection.getResponseCode();
