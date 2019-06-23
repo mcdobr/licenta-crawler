@@ -1,4 +1,4 @@
-package me.mircea.licenta.crawler;
+package me.mircea.licenta.crawler.impl;
 
 import com.google.common.base.Preconditions;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
@@ -8,6 +8,7 @@ import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
 import me.mircea.licenta.core.parser.utils.CssUtil;
 import me.mircea.licenta.core.parser.utils.HtmlUtil;
+import me.mircea.licenta.crawler.Crawler;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;

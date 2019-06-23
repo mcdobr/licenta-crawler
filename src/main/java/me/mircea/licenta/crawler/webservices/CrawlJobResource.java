@@ -9,9 +9,9 @@ import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.JobActiveOnHost;
 import me.mircea.licenta.core.crawl.db.model.JobType;
 import me.mircea.licenta.core.parser.utils.HtmlUtil;
-import me.mircea.licenta.crawler.BrowserCrawler;
+import me.mircea.licenta.crawler.impl.BrowserCrawler;
 import me.mircea.licenta.crawler.Crawler;
-import me.mircea.licenta.crawler.SitemapSaxCrawler;
+import me.mircea.licenta.crawler.impl.SitemapSaxCrawler;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,14 +77,14 @@ public class CrawlJobResource {
         } catch (MalformedURLException e) {
             LOGGER.warn("Some provided URLs are malformed {}", homepageNode);
             return Response.status(400).build();
-        } catch (IOException e) {
-            LOGGER.warn("Could not read config file to start job {}", e);
-            return Response.status(500).build();
         } catch (JobActiveOnHost e) {
             LOGGER.warn("A job was active on the host before trying to start a new one");
             Job activeJob = CrawlDatabaseManager.instance.getActiveJobOnDomain(domain);
             String redirectUri = request.getRequestURI() + "/" + activeJob.getId().toString();
             return Response.status(409).header("Location", redirectUri).entity(activeJob).build();
+        } catch (IOException e) {
+            LOGGER.warn("Could not read config file to start job {}", e);
+            return Response.status(500).build();
         }
     }
 

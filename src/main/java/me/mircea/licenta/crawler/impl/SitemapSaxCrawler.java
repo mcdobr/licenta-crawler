@@ -1,10 +1,11 @@
-package me.mircea.licenta.crawler;
+package me.mircea.licenta.crawler.impl;
 
 import crawlercommons.sitemaps.*;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.RobotDefaults;
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.Page;
+import me.mircea.licenta.crawler.Crawler;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
