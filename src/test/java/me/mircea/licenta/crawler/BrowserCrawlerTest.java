@@ -2,6 +2,7 @@ package me.mircea.licenta.crawler;
 
 import me.mircea.licenta.core.crawl.db.model.Job;
 import me.mircea.licenta.core.crawl.db.model.JobType;
+import me.mircea.licenta.crawler.impl.BrowserCrawler;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.Test;

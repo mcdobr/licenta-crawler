@@ -1,6 +1,6 @@
-package me.mircea.licenta.crawler;
+package me.mircea.licenta.crawler.impl;
 
-import me.mircea.licenta.core.crawl.db.model.Page;
+import me.mircea.licenta.crawler.Crawler;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
