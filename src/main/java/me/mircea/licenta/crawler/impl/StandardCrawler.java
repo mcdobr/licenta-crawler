@@ -27,7 +27,6 @@ public class StandardCrawler implements Crawler {
         this.activeQueue.add(seed);
     }
 
-
     @Override
     public void run() {
         while (!activeQueue.isEmpty()) {

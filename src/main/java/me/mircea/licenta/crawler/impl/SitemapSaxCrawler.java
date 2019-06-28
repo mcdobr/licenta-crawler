@@ -40,7 +40,7 @@ public class SitemapSaxCrawler implements Crawler {
 		}
 	}
 
-	public void parseSitemaps() throws IOException, UnknownFormatException {
+	private void parseSitemaps() throws IOException, UnknownFormatException {
 		Queue<String> siteMapQueue = new LinkedList<>();
 		siteMapQueue.addAll(job.getRobotRules().getSitemaps());
 

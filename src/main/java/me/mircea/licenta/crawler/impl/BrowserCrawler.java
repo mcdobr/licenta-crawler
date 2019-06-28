@@ -41,11 +41,24 @@ import java.util.stream.Collectors;
 public class BrowserCrawler implements Crawler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
 
+	private static final String WEBDRIVER_GECKO_DRIVER = "webdriver.gecko.driver";
+
 	private static final String BROWSER_IMAGE_BEHAVIOUR_PREFERENCE = "permissions.default.image";
 	private static final String BROWSER_DOM_POPUPS_PREFERENCE = "dom.popup_maximum";
 	private static final String BROWSER_POPUPS_MESSAGE_PREFERENCE = "privacy.popups.showBrowserMessage";
 	private static final String BROWSER_USER_AGENT_PREFERENCE = "general.useragent.override";
 	private static final String BROWSER_COOKIE_PREFERENCE = "network.cookie.cookieBehavior";
+
+
+	private static final String CONFIG_FILE_WEBDRIVER_PATH_KEY = "browser_webdriver_path";
+	private static final String CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY = "browser_log_file";
+	private static final String CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY = "browser_load_images";
+	private static final String CONFIG_FILE_BROWSER_POPUP_MAXIMUM = "browser_popup_maximum";
+	private static final String CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE = "browser_popup_show_browser_message";
+	private static final String CONFIG_FILE_USER_AGENT_KEY = "user_agent";
+	private static final String CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR = "browser_cookie_behavior";
+	private static final String CONFIG_FILE_BROWSER_HEADLESS = "browser_headless";
+
 
 	private final WebDriver driver;
 	private final Job job;
@@ -53,18 +66,18 @@ public class BrowserCrawler implements Crawler {
 	public BrowserCrawler(Job job) {
 		this.job = job;
 
-		System.setProperty("webdriver.gecko.driver", RobotDefaults.getDefault("browser_webdriver_path"));
-		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, RobotDefaults.getDefault("browser_log_file"));
+		System.setProperty(WEBDRIVER_GECKO_DRIVER, RobotDefaults.getDefault(CONFIG_FILE_WEBDRIVER_PATH_KEY));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, RobotDefaults.getDefault(CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY));
 		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_load_images")));
-		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_popup_maximum")));
-		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(RobotDefaults.getDefault("browser_popup_show_browser_message")));
-		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getDefault("user_agent"));
-		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault("browser_cookie_behavior")));
+		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
+		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
+		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
+		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getDefault(CONFIG_FILE_USER_AGENT_KEY));
+		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
 
 		FirefoxOptions opts = new FirefoxOptions();
-		opts.setHeadless(Boolean.valueOf(RobotDefaults.getDefault("browser_headless")));
+		opts.setHeadless(Boolean.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_HEADLESS)));
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
@@ -129,24 +142,22 @@ public class BrowserCrawler implements Crawler {
 
 	private Document getDocumentStripped(String url) {
 		Preconditions.checkNotNull(url);
-
-		// TODO: check this
 		Document doc = Jsoup.parse(url, this.job.getDomain());
 		return HtmlUtil.sanitizeHtml(doc);
 	}
 	
 	private boolean visitNextPage() {
         final int MAX_WAIT_IN_SECONDS = 5;
-	    String nextPageLinkXpath = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
+	    final String nextPageLinkXpathSelector = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
 
-	    if (!driver.findElements(By.xpath(nextPageLinkXpath)).isEmpty()) {
+	    if (!driver.findElements(By.xpath(nextPageLinkXpathSelector)).isEmpty()) {
             new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
-                    .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(nextPageLinkXpath)));
+                    .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(nextPageLinkXpathSelector)));
             new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
-                    .until(ExpectedConditions.elementToBeClickable(By.xpath(nextPageLinkXpath)));
+                    .until(ExpectedConditions.elementToBeClickable(By.xpath(nextPageLinkXpathSelector)));
 
 
-            WebElement nextPageLink = driver.findElement(By.xpath(nextPageLinkXpath));
+            WebElement nextPageLink = driver.findElement(By.xpath(nextPageLinkXpathSelector));
             JavascriptExecutor executor = (JavascriptExecutor) driver;
             executor.executeScript("arguments[0].click();", nextPageLink);
             return true;
