@@ -22,6 +22,8 @@ import java.util.zip.GZIPInputStream;
 
 public class SitemapSaxCrawler implements Crawler {
 	private static final Logger logger = LoggerFactory.getLogger(SitemapSaxCrawler.class);
+	private static final int HTTP_CONNECT_TIMEOUT_IN_MILLISECONDS = 50_000;
+	private static final int HTTP_READ_TIMEOUT_IN_MILLISECONDS = 50_000;
 
 	private final Job job;
 
@@ -41,8 +43,7 @@ public class SitemapSaxCrawler implements Crawler {
 	}
 
 	private void parseSitemaps() throws IOException, UnknownFormatException {
-		Queue<String> siteMapQueue = new LinkedList<>();
-		siteMapQueue.addAll(job.getRobotRules().getSitemaps());
+		Queue<String> siteMapQueue = new LinkedList<>(job.getRobotRules().getSitemaps());
 
 		while (!siteMapQueue.isEmpty()) {
 			URL queueFrontUrl = new URL(siteMapQueue.poll());
@@ -94,14 +95,14 @@ public class SitemapSaxCrawler implements Crawler {
 		final int MAX_REDIRECTS = 5;
 		do {
 			connection = (HttpURLConnection) url.openConnection();
-			connection.setConnectTimeout(50 * 1000);
-			connection.setReadTimeout(50 * 1000);
+			connection.setConnectTimeout(HTTP_CONNECT_TIMEOUT_IN_MILLISECONDS);
+			connection.setReadTimeout(HTTP_READ_TIMEOUT_IN_MILLISECONDS);
 			connection.setInstanceFollowRedirects(false);
 			connection.setRequestProperty("User-Agent", RobotDefaults.getDefault("user_agent"));
 			connection.connect();
 
 			int httpStatus = connection.getResponseCode();
-			redirect = (httpStatus == HttpURLConnection.HTTP_MOVED_PERM) || (httpStatus == HttpURLConnection.HTTP_MOVED_TEMP) || (httpStatus == HttpURLConnection.HTTP_SEE_OTHER);
+			redirect = shouldRedirect(httpStatus);
 
 			if (redirect) {
 				String location = URLDecoder.decode(connection.getHeaderField("Location"), "UTF-8");
@@ -117,5 +118,11 @@ public class SitemapSaxCrawler implements Crawler {
 		}
 
 		return Optional.of(connection);
+	}
+
+	private boolean shouldRedirect(int httpStatus) {
+		return (httpStatus == HttpURLConnection.HTTP_MOVED_PERM)
+				|| (httpStatus == HttpURLConnection.HTTP_MOVED_TEMP)
+				|| (httpStatus == HttpURLConnection.HTTP_SEE_OTHER);
 	}
 }
