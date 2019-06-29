@@ -40,8 +40,7 @@ public class StandardCrawler implements Crawler {
                     //this.activeQueue
 
 
-
-                Thread.sleep(1000);
+                    Thread.sleep(1000);
             } catch (IOException e) {
                 LOGGER.warn("An I/O error occured {}", e);
             } catch (InterruptedException e) {

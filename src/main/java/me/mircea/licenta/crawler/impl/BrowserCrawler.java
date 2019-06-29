@@ -66,18 +66,19 @@ public class BrowserCrawler implements Crawler {
 	public BrowserCrawler(Job job) {
 		this.job = job;
 
-		System.setProperty(WEBDRIVER_GECKO_DRIVER, RobotDefaults.getDefault(CONFIG_FILE_WEBDRIVER_PATH_KEY));
-		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, RobotDefaults.getDefault(CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY));
+		System.setProperty(WEBDRIVER_GECKO_DRIVER, BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_WEBDRIVER_PATH_KEY));
+		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY));
 		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
-		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
-		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
 		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getDefault(CONFIG_FILE_USER_AGENT_KEY));
-		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
+
+		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
+		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
+		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
+		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
 
 		FirefoxOptions opts = new FirefoxOptions();
-		opts.setHeadless(Boolean.valueOf(RobotDefaults.getDefault(CONFIG_FILE_BROWSER_HEADLESS)));
+		opts.setHeadless(Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_HEADLESS)));
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
