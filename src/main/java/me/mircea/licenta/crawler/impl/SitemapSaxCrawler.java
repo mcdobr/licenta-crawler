@@ -27,26 +27,26 @@ import java.util.zip.GZIPInputStream;
  * This class is designed to handle a host that links to sitemaps from the robots.txt.
  * @author mircea
  */
-public class SitemapSaxCrawler implements Crawler {
-    private static final Logger logger = LoggerFactory.getLogger(SitemapSaxCrawler.class);
+public class SitemapSaxCrawler extends Crawler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SitemapSaxCrawler.class);
     private static final int HTTP_CONNECT_TIMEOUT_IN_MILLISECONDS = 50_000;
     private static final int HTTP_READ_TIMEOUT_IN_MILLISECONDS = 50_000;
 
-    private final Job job;
-
     public SitemapSaxCrawler(Job job) {
-        this.job = job;
+        super(job);
     }
 
     @Override
     public void run() {
+        startCrawlJob();
         try {
             parseSitemaps();
         } catch (IOException e) {
-            logger.info("Could not handle a connection: {}", e.getMessage());
+            LOGGER.info("Could not handle a connection: {}", e.getMessage());
         } catch (UnknownFormatException e) {
-            logger.info("Could not parse a sitemap: {}", e.getMessage());
+            LOGGER.info("Could not parse a sitemap: {}", e.getMessage());
         }
+        finishCrawlJob();
     }
 
     private void parseSitemaps() throws IOException, UnknownFormatException {
@@ -82,12 +82,12 @@ public class SitemapSaxCrawler implements Crawler {
                             .map(link -> new Page(link.getUrl().toString(), "sitemap", Instant.now()))
                             .collect(Collectors.toList());
 
-                    logger.info("Discovered {} urls about to be upserted", concreteSiteMap.getSiteMapUrls().size());
+                    LOGGER.info("Discovered {} urls about to be upserted", concreteSiteMap.getSiteMapUrls().size());
                     CrawlDatabaseManager.instance.upsertManyPages(pagesToBeUpserted);
                 }
             }
         }
-        logger.info("Finished parsing sitemaps on {}", job.getDomain());
+        LOGGER.info("Finished parsing sitemaps on {}", job.getDomain());
     }
 
     /**
@@ -120,7 +120,7 @@ public class SitemapSaxCrawler implements Crawler {
         } while (redirect && redirectCounter < MAX_REDIRECTS);
 
         if (redirectCounter >= MAX_REDIRECTS) {
-            logger.warn("Redirects number exceeded maximum redirects on url {}", originalUrl);
+            LOGGER.warn("Redirects number exceeded maximum redirects on url {}", originalUrl);
             return Optional.empty();
         }
 

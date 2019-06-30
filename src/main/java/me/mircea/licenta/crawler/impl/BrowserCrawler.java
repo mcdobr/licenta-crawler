@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * not make parallel requests and make queries with a small time gap.
  */
 
-public class BrowserCrawler implements Crawler {
+public class BrowserCrawler extends Crawler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
 	private static final String NEXT_PAGE_LINK_XPATH_SELECTOR = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
 	private static final int ELEMENT_CLICK_INTERCEPTED_X_OFFSET = 0;
@@ -64,10 +64,9 @@ public class BrowserCrawler implements Crawler {
 	private static final int WEB_DRIVER_IMPLICIT_WAIT_AMOUNT = 10;
 
 	private final WebDriver driver;
-	private final Job job;
 	
 	public BrowserCrawler(Job job) {
-		this.job = job;
+		super(job);
 
 		System.setProperty(WEBDRIVER_GECKO_DRIVER, BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_WEBDRIVER_PATH_KEY));
 		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY));
@@ -90,28 +89,15 @@ public class BrowserCrawler implements Crawler {
 	@Override
 	public void run() {
 		startCrawlJob();
-		traverseMultiProductPageCollection(job.getSeeds());
+		crawl(job.getSeeds());
 		finishCrawlJob();
-	}
-
-	private void startCrawlJob() {
-		LOGGER.info("Started crawling job {}", this.job);
-		CrawlDatabaseManager.instance.upsertJob(this.job);
-	}
-
-	private void finishCrawlJob() {
-		this.job.setEnd(Instant.now());
-		this.job.setStatus(JobStatus.FINISHED);
-		CrawlDatabaseManager.instance.upsertJob(this.job);
-
-		LOGGER.info("Finished crawling job {}", this.job);
 	}
 
 	/**
 	 * @param seeds Collection of URLs that provide a starting point.
 	 * Crawl starting from a collection of seeds.
 	 */
-	private void traverseMultiProductPageCollection(Collection<String> seeds) {
+	private void crawl(Collection<String> seeds) {
 		for (String seed: seeds) {
 			traverseMultiProductPage(seed);
 		}
