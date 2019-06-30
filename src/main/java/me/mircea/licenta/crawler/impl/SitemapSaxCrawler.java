@@ -23,6 +23,10 @@ import java.util.Queue;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
+/**
+ * This class is designed to handle a host that links to sitemaps from the robots.txt.
+ * @author mircea
+ */
 public class SitemapSaxCrawler implements Crawler {
     private static final Logger logger = LoggerFactory.getLogger(SitemapSaxCrawler.class);
     private static final int HTTP_CONNECT_TIMEOUT_IN_MILLISECONDS = 50_000;
@@ -123,6 +127,10 @@ public class SitemapSaxCrawler implements Crawler {
         return Optional.of(connection);
     }
 
+    /**
+     * @param httpStatus
+     * @return Decision if request should be retried.
+     */
     private boolean shouldRedirect(int httpStatus) {
         return (httpStatus == HttpURLConnection.HTTP_MOVED_PERM)
                 || (httpStatus == HttpURLConnection.HTTP_MOVED_TEMP)

@@ -9,6 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+/**
+ * @author mircea
+ * This class was designed with the hope to keep statistics separate from
+ * the actual web scraping.
+ */
 class BrowserCrawlerSettingsUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawlerSettingsUtil.class);
     private static Map<String, String> crawlerSettings;

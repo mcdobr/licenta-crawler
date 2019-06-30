@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.RobotDefaults;
 import me.mircea.licenta.core.crawl.db.model.Job;
+import me.mircea.licenta.core.crawl.db.model.JobStatus;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
 import me.mircea.licenta.core.parser.utils.CssUtil;
@@ -17,7 +18,6 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
-import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
@@ -52,7 +52,6 @@ public class BrowserCrawler implements Crawler {
 	private static final String BROWSER_DOM_POPUPS_PREFERENCE = "dom.popup_maximum";
 	private static final String BROWSER_POPUPS_MESSAGE_PREFERENCE = "privacy.popups.showBrowserMessage";
 	private static final String BROWSER_USER_AGENT_PREFERENCE = "general.useragent.override";
-	private static final String BROWSER_COOKIE_PREFERENCE = "network.cookie.cookieBehavior";
 
 	private static final String CONFIG_FILE_WEBDRIVER_PATH_KEY = "browser_webdriver_path";
 	private static final String CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY = "browser_log_file";
@@ -60,7 +59,6 @@ public class BrowserCrawler implements Crawler {
 	private static final String CONFIG_FILE_BROWSER_POPUP_MAXIMUM = "browser_popup_maximum";
 	private static final String CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE = "browser_popup_show_browser_message";
 
-	private static final String CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR = "browser_cookie_behavior";
 	private static final String CONFIG_FILE_BROWSER_HEADLESS = "browser_headless";
 
 	private static final int WEB_DRIVER_IMPLICIT_WAIT_AMOUNT = 10;
@@ -80,7 +78,6 @@ public class BrowserCrawler implements Crawler {
 		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
 		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
 		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
-		//profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
 
 		FirefoxOptions opts = new FirefoxOptions();
 		opts.setHeadless(Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_HEADLESS)));
@@ -92,10 +89,28 @@ public class BrowserCrawler implements Crawler {
 	
 	@Override
 	public void run() {
+		startCrawlJob();
 		traverseMultiProductPageCollection(job.getSeeds());
+		finishCrawlJob();
 	}
 
+	private void startCrawlJob() {
+		LOGGER.info("Started crawling job {}", this.job);
+		CrawlDatabaseManager.instance.upsertJob(this.job);
+	}
 
+	private void finishCrawlJob() {
+		this.job.setEnd(Instant.now());
+		this.job.setStatus(JobStatus.FINISHED);
+		CrawlDatabaseManager.instance.upsertJob(this.job);
+
+		LOGGER.info("Finished crawling job {}", this.job);
+	}
+
+	/**
+	 * @param seeds Collection of URLs that provide a starting point.
+	 * Crawl starting from a collection of seeds.
+	 */
 	private void traverseMultiProductPageCollection(Collection<String> seeds) {
 		for (String seed: seeds) {
 			traverseMultiProductPage(seed);
@@ -103,9 +118,12 @@ public class BrowserCrawler implements Crawler {
 
 		LOGGER.info("Quitting the automated browser...");
 		driver.close();
-		driver.quit();
 	}
 
+	/**
+	 * @param firstMultiProductPage
+	 * Exhaust collection starting from seed.
+	 */
 	private void traverseMultiProductPage(final String firstMultiProductPage) {
 		LOGGER.info("Following pagination links starting from {}", firstMultiProductPage);
 		driver.get(firstMultiProductPage);
@@ -187,7 +205,7 @@ public class BrowserCrawler implements Crawler {
 				nextPageLink.click();
 				return;
 			} catch (ElementClickInterceptedException e) {
-				LOGGER.warn("Tried to click element but something is probably obscuring it at the edge of the viewport. Will move by implicit deltaOffset.");
+				LOGGER.warn("Tried to click element but something is probably obscuring it at the edge of the viewport. Will move by implicit offset.");
 				String scrollByOffsetsScript = String.format("scrollBy(%d, %d);", ELEMENT_CLICK_INTERCEPTED_X_OFFSET, ELEMENT_CLICK_INTERCEPTED_Y_OFFSET);
 				((JavascriptExecutor)driver).executeScript(scrollByOffsetsScript);
 			}

@@ -102,7 +102,6 @@ public class CrawlJobResource {
                 .collect(Collectors.toList());
     }
 
-
     private Crawler chooseBestCrawlingStrategy(Job job) {
         Crawler crawler;
         if (!job.getRobotRules().getSitemaps().isEmpty()) {
