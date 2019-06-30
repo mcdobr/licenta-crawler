@@ -17,6 +17,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
@@ -40,6 +41,10 @@ import java.util.stream.Collectors;
 
 public class BrowserCrawler implements Crawler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BrowserCrawler.class);
+	private static final String NEXT_PAGE_LINK_XPATH_SELECTOR = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
+	private static final int ELEMENT_CLICK_INTERCEPTED_X_OFFSET = 0;
+	private static final int ELEMENT_CLICK_INTERCEPTED_Y_OFFSET = -100;
+	private static final int MOVE_WAIT_IN_SECONDS = 3;
 
 	private static final String WEBDRIVER_GECKO_DRIVER = "webdriver.gecko.driver";
 
@@ -49,16 +54,16 @@ public class BrowserCrawler implements Crawler {
 	private static final String BROWSER_USER_AGENT_PREFERENCE = "general.useragent.override";
 	private static final String BROWSER_COOKIE_PREFERENCE = "network.cookie.cookieBehavior";
 
-
 	private static final String CONFIG_FILE_WEBDRIVER_PATH_KEY = "browser_webdriver_path";
 	private static final String CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY = "browser_log_file";
 	private static final String CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY = "browser_load_images";
 	private static final String CONFIG_FILE_BROWSER_POPUP_MAXIMUM = "browser_popup_maximum";
 	private static final String CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE = "browser_popup_show_browser_message";
-	private static final String CONFIG_FILE_USER_AGENT_KEY = "user_agent";
+
 	private static final String CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR = "browser_cookie_behavior";
 	private static final String CONFIG_FILE_BROWSER_HEADLESS = "browser_headless";
 
+	private static final int WEB_DRIVER_IMPLICIT_WAIT_AMOUNT = 10;
 
 	private final WebDriver driver;
 	private final Job job;
@@ -70,19 +75,19 @@ public class BrowserCrawler implements Crawler {
 		System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY));
 		
 		FirefoxProfile profile = new FirefoxProfile();
-		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getDefault(CONFIG_FILE_USER_AGENT_KEY));
+		profile.setPreference(BROWSER_USER_AGENT_PREFERENCE, RobotDefaults.getUserAgent());
 
 		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
 		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
 		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
-		profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
+		//profile.setPreference(BROWSER_COOKIE_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_COOKIE_BEHAVIOR)));
 
 		FirefoxOptions opts = new FirefoxOptions();
 		opts.setHeadless(Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_HEADLESS)));
 		opts.setProfile(profile);
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
-		this.driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
+		this.driver.manage().timeouts().implicitlyWait(WEB_DRIVER_IMPLICIT_WAIT_AMOUNT, TimeUnit.SECONDS);
 	}
 	
 	@Override
@@ -148,22 +153,51 @@ public class BrowserCrawler implements Crawler {
 	}
 	
 	private boolean visitNextPage() {
-        final int MAX_WAIT_IN_SECONDS = 5;
-	    final String nextPageLinkXpathSelector = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
+		final int MAX_EXPLICIT_WAIT_IN_SECONDS = 30;
 
-	    if (!driver.findElements(By.xpath(nextPageLinkXpathSelector)).isEmpty()) {
-            new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
-                    .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(nextPageLinkXpathSelector)));
-            new WebDriverWait(driver, MAX_WAIT_IN_SECONDS)
-                    .until(ExpectedConditions.elementToBeClickable(By.xpath(nextPageLinkXpathSelector)));
+		if (!driver.findElements(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)).isEmpty()) {
+			try {
+				WebElement nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
 
+				new WebDriverWait(driver, MAX_EXPLICIT_WAIT_IN_SECONDS)
+						.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
+				new WebDriverWait(driver, MAX_EXPLICIT_WAIT_IN_SECONDS)
+						.until(ExpectedConditions.elementToBeClickable(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
 
-            WebElement nextPageLink = driver.findElement(By.xpath(nextPageLinkXpathSelector));
-            JavascriptExecutor executor = (JavascriptExecutor) driver;
-            executor.executeScript("arguments[0].click();", nextPageLink);
-            return true;
-        } else {
-	        return false;
-        }
+				tryToClickElement(nextPageLink);
+			} catch (RuntimeException e) {
+				LOGGER.error("Visiting next link threw {}", e);
+			}
+
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private void tryToClickElement(WebElement nextPageLink) {
+		final int MAX_CLICK_TRIES = 10;
+
+		((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", nextPageLink);
+		for (int tryNumber = 0; tryNumber < MAX_CLICK_TRIES; ++tryNumber) {
+			try {
+				waitForElementToBeVisibleAndClickable();
+
+				nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
+				nextPageLink.click();
+				return;
+			} catch (ElementClickInterceptedException e) {
+				LOGGER.warn("Tried to click element but something is probably obscuring it at the edge of the viewport. Will move by implicit deltaOffset.");
+				String scrollByOffsetsScript = String.format("scrollBy(%d, %d);", ELEMENT_CLICK_INTERCEPTED_X_OFFSET, ELEMENT_CLICK_INTERCEPTED_Y_OFFSET);
+				((JavascriptExecutor)driver).executeScript(scrollByOffsetsScript);
+			}
+		}
+	}
+
+	private void waitForElementToBeVisibleAndClickable() {
+		new WebDriverWait(driver, MOVE_WAIT_IN_SECONDS)
+				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
+		new WebDriverWait(driver, MOVE_WAIT_IN_SECONDS)
+				.until(ExpectedConditions.elementToBeClickable(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
 	}
 }
