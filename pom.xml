@@ -102,9 +102,9 @@
                     <version>2.2</version>
                     <configuration>
                         <url>http://localhost:8080/manager/text</url>
-			<server>TomcatServer</server>
-			<username>admin</username>
-			<password>plsdeployThis123</password>
+                        <server>TomcatServer</server>
+                        <username>admin</username>
+                        <password>plsdeployThis123</password>
                         <path>/crawler</path>
                     </configuration>
                 </plugin>
@@ -145,6 +145,21 @@
 
             <properties>
                 <build.profile.id>prod</build.profile.id>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>prod_win</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>src/main/resources/prod_win</directory>
+                    </resource>
+                </resources>
+            </build>
+
+            <properties>
+                <build.profile.id>prod_win</build.profile.id>
             </properties>
         </profile>
     </profiles>
