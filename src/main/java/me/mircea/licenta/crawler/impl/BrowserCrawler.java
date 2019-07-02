@@ -44,7 +44,8 @@ public class BrowserCrawler extends Crawler {
 	private static final String NEXT_PAGE_LINK_XPATH_SELECTOR = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
 	private static final int ELEMENT_CLICK_INTERCEPTED_X_OFFSET = 0;
 	private static final int ELEMENT_CLICK_INTERCEPTED_Y_OFFSET = -100;
-	private static final int MOVE_WAIT_IN_SECONDS = 3;
+	private static final int EXPLICIT_MAX_WAIT_IN_SECONDS = 30;
+
 
 	private static final String WEBDRIVER_GECKO_DRIVER = "webdriver.gecko.driver";
 
@@ -157,20 +158,14 @@ public class BrowserCrawler extends Crawler {
 	}
 	
 	private boolean visitNextPage() {
-		final int MAX_EXPLICIT_WAIT_IN_SECONDS = 30;
-
 		if (!driver.findElements(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)).isEmpty()) {
 			try {
 				WebElement nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
-
-				new WebDriverWait(driver, MAX_EXPLICIT_WAIT_IN_SECONDS)
-						.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
-				new WebDriverWait(driver, MAX_EXPLICIT_WAIT_IN_SECONDS)
-						.until(ExpectedConditions.elementToBeClickable(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
+				waitForElementToBeVisibleAndClickable();
 
 				tryToClickElement(nextPageLink);
 			} catch (RuntimeException e) {
-				LOGGER.error("Visiting next link threw {}", e);
+				LOGGER.error("Visiting next link on domain {} with location {} threw {}", this.job.getDomain(), driver.getCurrentUrl(), e);
 			}
 
 			return true;
@@ -199,9 +194,9 @@ public class BrowserCrawler extends Crawler {
 	}
 
 	private void waitForElementToBeVisibleAndClickable() {
-		new WebDriverWait(driver, MOVE_WAIT_IN_SECONDS)
+		new WebDriverWait(driver, EXPLICIT_MAX_WAIT_IN_SECONDS)
 				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
-		new WebDriverWait(driver, MOVE_WAIT_IN_SECONDS)
+		new WebDriverWait(driver, EXPLICIT_MAX_WAIT_IN_SECONDS)
 				.until(ExpectedConditions.elementToBeClickable(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
 	}
 }
