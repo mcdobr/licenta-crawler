@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
 import me.mircea.licenta.core.crawl.db.CrawlDatabaseManager;
 import me.mircea.licenta.core.crawl.db.RobotDefaults;
 import me.mircea.licenta.core.crawl.db.model.Job;
-import me.mircea.licenta.core.crawl.db.model.JobStatus;
 import me.mircea.licenta.core.crawl.db.model.Page;
 import me.mircea.licenta.core.crawl.db.model.PageType;
 import me.mircea.licenta.core.parser.utils.CssUtil;
@@ -44,7 +43,7 @@ public class BrowserCrawler extends Crawler {
 	private static final String NEXT_PAGE_LINK_XPATH_SELECTOR = "//ul[contains(@class,'pagination')]/li[contains(@class, 'active')]/following-sibling::li[not(contains(@class, 'disabled'))][1]/a";
 	private static final int ELEMENT_CLICK_INTERCEPTED_X_OFFSET = 0;
 	private static final int ELEMENT_CLICK_INTERCEPTED_Y_OFFSET = -100;
-	private static final int EXPLICIT_MAX_WAIT_IN_SECONDS = 30;
+	private static final int EXPLICIT_MAX_WAIT_IN_SECONDS = 60;
 
 
 	private static final String WEBDRIVER_GECKO_DRIVER = "webdriver.gecko.driver";
@@ -59,10 +58,11 @@ public class BrowserCrawler extends Crawler {
 	private static final String CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY = "browser_load_images";
 	private static final String CONFIG_FILE_BROWSER_POPUP_MAXIMUM = "browser_popup_maximum";
 	private static final String CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE = "browser_popup_show_browser_message";
-
 	private static final String CONFIG_FILE_BROWSER_HEADLESS = "browser_headless";
 
 	private static final int WEB_DRIVER_IMPLICIT_WAIT_AMOUNT = 10;
+	private static final int WEB_DRIVER_WINDOW_WIDTH = 1920;
+	private static final int WEB_DRIVER_WINDOW_HEIGHT = 1080;
 
 	private final WebDriver driver;
 	
@@ -85,6 +85,10 @@ public class BrowserCrawler extends Crawler {
 		opts.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
 		this.driver = new FirefoxDriver(opts);
 		this.driver.manage().timeouts().implicitlyWait(WEB_DRIVER_IMPLICIT_WAIT_AMOUNT, TimeUnit.SECONDS);
+
+		LOGGER.error("Current window size: {}", this.driver.manage().window().getSize());
+		this.driver.manage().window().setSize(new Dimension(WEB_DRIVER_WINDOW_WIDTH, WEB_DRIVER_WINDOW_HEIGHT));
+		LOGGER.error("Resized to: {}", this.driver.manage().window().getSize());
 	}
 	
 	@Override
@@ -124,7 +128,7 @@ public class BrowserCrawler extends Crawler {
 			
 			Page shelfPage = new Page(shelfUrl, previousShelfUrl, PageType.SHELF, retrievedTime);
 			List<String> productUrls = getSingleProductPages(shelfDoc);
-			LOGGER.info("Got {} product urls", productUrls.size());
+			LOGGER.info("Got {} product urls on {}", productUrls.size(), shelfPage.getUrl());
 
 			List<Page> batchOfPages = productUrls.stream()
 					.map(productUrl -> new Page(productUrl, shelfUrl, PageType.PRODUCT, retrievedTime))
@@ -161,7 +165,7 @@ public class BrowserCrawler extends Crawler {
 		if (!driver.findElements(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)).isEmpty()) {
 			try {
 				WebElement nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
-				waitForElementToBeVisibleAndClickable();
+				waitForElementToBeClickable();
 
 				tryToClickElement(nextPageLink);
 			} catch (RuntimeException e) {
@@ -180,7 +184,7 @@ public class BrowserCrawler extends Crawler {
 		((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", nextPageLink);
 		for (int tryNumber = 0; tryNumber < MAX_CLICK_TRIES; ++tryNumber) {
 			try {
-				waitForElementToBeVisibleAndClickable();
+				waitForElementToBeClickable();
 
 				nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
 				nextPageLink.click();
@@ -191,11 +195,11 @@ public class BrowserCrawler extends Crawler {
 				((JavascriptExecutor)driver).executeScript(scrollByOffsetsScript);
 			}
 		}
+
+		LOGGER.warn("Could not click the element");
 	}
 
-	private void waitForElementToBeVisibleAndClickable() {
-		new WebDriverWait(driver, EXPLICIT_MAX_WAIT_IN_SECONDS)
-				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
+	private void waitForElementToBeClickable() {
 		new WebDriverWait(driver, EXPLICIT_MAX_WAIT_IN_SECONDS)
 				.until(ExpectedConditions.elementToBeClickable(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)));
 	}
