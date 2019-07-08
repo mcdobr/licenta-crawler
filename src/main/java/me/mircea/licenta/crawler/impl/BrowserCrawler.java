@@ -44,6 +44,7 @@ public class BrowserCrawler extends Crawler {
 	private static final int ELEMENT_CLICK_INTERCEPTED_X_OFFSET = 0;
 	private static final int ELEMENT_CLICK_INTERCEPTED_Y_OFFSET = -100;
 	private static final int EXPLICIT_MAX_WAIT_IN_SECONDS = 60;
+	private static final int MAX_TIMEOUTS_ON_PAGE = 3;
 
 
 	private static final String WEBDRIVER_GECKO_DRIVER = "webdriver.gecko.driver";
@@ -52,6 +53,9 @@ public class BrowserCrawler extends Crawler {
 	private static final String BROWSER_DOM_POPUPS_PREFERENCE = "dom.popup_maximum";
 	private static final String BROWSER_POPUPS_MESSAGE_PREFERENCE = "privacy.popups.showBrowserMessage";
 	private static final String BROWSER_USER_AGENT_PREFERENCE = "general.useragent.override";
+	private static final String BROWSER_COOKIE_PREFERENCE = "network.cookie.cookieBehavior";
+
+	private static final int BROWSER_BLOCK_ALL_COOKIES = 2;
 
 	private static final String CONFIG_FILE_WEBDRIVER_PATH_KEY = "browser_webdriver_path";
 	private static final String CONFIG_FILE_BROWSER_LOG_FILE_PATH_KEY = "browser_log_file";
@@ -78,6 +82,10 @@ public class BrowserCrawler extends Crawler {
 		profile.setPreference(BROWSER_IMAGE_BEHAVIOUR_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_LOAD_IMAGES_KEY)));
 		profile.setPreference(BROWSER_DOM_POPUPS_PREFERENCE, Integer.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_MAXIMUM)));
 		profile.setPreference(BROWSER_POPUPS_MESSAGE_PREFERENCE, Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_POPUP_SHOW_BROWSER_MESSAGE)));
+
+		if (job.isDisallowCookies()) {
+			profile.setPreference(BROWSER_COOKIE_PREFERENCE, BROWSER_BLOCK_ALL_COOKIES);
+		}
 
 		FirefoxOptions opts = new FirefoxOptions();
 		opts.setHeadless(Boolean.valueOf(BrowserCrawlerSettingsUtil.getSetting(CONFIG_FILE_BROWSER_HEADLESS)));
@@ -163,16 +171,23 @@ public class BrowserCrawler extends Crawler {
 	
 	private boolean visitNextPage() {
 		if (!driver.findElements(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR)).isEmpty()) {
-			try {
-				WebElement nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
-				waitForElementToBeClickable();
-
-				tryToClickElement(nextPageLink);
-			} catch (RuntimeException e) {
-				LOGGER.error("Visiting next link on domain {} with location {} threw {}", this.job.getDomain(), driver.getCurrentUrl(), e);
+			int timeouts = 0;
+			while (timeouts < MAX_TIMEOUTS_ON_PAGE) {
+				try {
+					WebElement nextPageLink = driver.findElement(By.xpath(NEXT_PAGE_LINK_XPATH_SELECTOR));
+					waitForElementToBeClickable();
+					tryToClickElement(nextPageLink);
+					return true;
+				} catch (TimeoutException e) {
+					LOGGER.info("Timeout occurred on page {}", driver.getCurrentUrl());
+					++timeouts;
+				} catch (RuntimeException e) {
+					LOGGER.error("Visiting next link on domain {} with location {} threw {}", this.job.getDomain(), driver.getCurrentUrl(), e);
+				}
 			}
 
-			return true;
+			LOGGER.error("Max number of timeouts on page {} exceeded", driver.getCurrentUrl());
+			return false;
 		} else {
 			return false;
 		}

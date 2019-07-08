@@ -25,10 +25,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -60,7 +57,19 @@ public class CrawlJobResource {
         JsonNode homepageNode = crawlRequest.get("homepage");
         JsonNode seedsNode = crawlRequest.get("seeds");
         JsonNode additionalSitemapsNode = crawlRequest.get("additionalSitemaps");
+        JsonNode disallowCookiesNode = crawlRequest.get("disallowCookies");
 
+        LOGGER.error("disallowCookiesNode = {}, {}", disallowCookiesNode, disallowCookiesNode.booleanValue());
+        LOGGER.error("disallowCookiesNode != null = {}", disallowCookiesNode != null);
+
+        boolean disallowCookies;
+        if (disallowCookiesNode != null) {
+            disallowCookies = disallowCookiesNode.booleanValue();
+        } else {
+            disallowCookies = false;
+        }
+
+        LOGGER.error("disallowCookies final = {}", disallowCookies);
         Job job;
         String domain = null;
         try {
@@ -69,7 +78,7 @@ public class CrawlJobResource {
                 throw new MalformedURLException("Some URLs are malformed");
             }
 
-            job = new Job(homepageNode.asText(), JobType.CRAWL, convertJsonTextArrayToIterable(seedsNode), convertJsonTextArrayToIterable(additionalSitemapsNode));
+            job = new Job(homepageNode.asText(), JobType.CRAWL, convertJsonTextArrayToIterable(seedsNode), convertJsonTextArrayToIterable(additionalSitemapsNode), disallowCookies);
             Crawler crawler = chooseBestCrawlingStrategy(job);
             ASYNC_TASK_EXECUTOR.submit(crawler);
 

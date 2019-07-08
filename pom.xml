@@ -104,7 +104,8 @@
                         <url>http://localhost:8080/manager/text</url>
                         <server>TomcatServer</server>
                         <username>admin</username>
-                        <password>plsdeployThis123</password>
+                        <password>admin</password>
+                        <update>true</update>
                         <path>/crawler</path>
                     </configuration>
                 </plugin>
