@@ -59,9 +59,6 @@ public class CrawlJobResource {
         JsonNode additionalSitemapsNode = crawlRequest.get("additionalSitemaps");
         JsonNode disallowCookiesNode = crawlRequest.get("disallowCookies");
 
-        LOGGER.error("disallowCookiesNode = {}, {}", disallowCookiesNode, disallowCookiesNode.booleanValue());
-        LOGGER.error("disallowCookiesNode != null = {}", disallowCookiesNode != null);
-
         boolean disallowCookies;
         if (disallowCookiesNode != null) {
             disallowCookies = disallowCookiesNode.booleanValue();
